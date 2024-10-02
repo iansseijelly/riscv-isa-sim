@@ -149,6 +149,11 @@ void processor_t::enable_log_commits()
   mmu->flush_tlb(); // the TLB caches this setting
 }
 
+void processor_t::enable_trace()
+{
+  trace_enabled = true;
+}
+
 void processor_t::reset()
 {
   xlen = isa.get_max_xlen();
