@@ -22,12 +22,12 @@ enum insn_type {
   I_RESERVED           = 7,
   I_CALL_UNINFERABLE   = 8,
   I_CALL_INFERABLE     = 9,
-  I_JUMP_UNINFERABLE   = 10,
-  I_JUMP_INFERABLE     = 11,
-  I_COROUTINE_SWAP     = 12,
-  I_RETURN             = 13,
-  I_OTHER_UNINFERABLE  = 14,
-  I_OTHER_INFERABLE    = 15,
+  I_JUMP_UNINFERABLE   = 10, // a
+  I_JUMP_INFERABLE     = 11, // b
+  I_COROUTINE_SWAP     = 12, // c
+  I_RETURN             = 13, // d
+  I_OTHER_UNINFERABLE  = 14, // e
+  I_OTHER_INFERABLE    = 15, // f
 };
 
 // Enumerates all possible privilege level encodings

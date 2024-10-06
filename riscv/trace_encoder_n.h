@@ -74,6 +74,9 @@ public:
   trace_encoder_n() {
     this->trace_sink= fopen("trace_n.bin", "wb");
     this->debug_reference = fopen("trace_n_ref_debug.log", "wb");
+    // for profiling ingress distribution
+    this->ingress_log = fopen("trace_n_ingress.csv", "wb");
+    this->print_ingress_csv_header();
     this->active = true;
     this->enabled = false;
     this->src = 0;
@@ -90,6 +93,7 @@ public:
 private:
   FILE* trace_sink;
   FILE* debug_reference;
+  FILE* ingress_log;
 
   hart_to_encoder_ingress_t packet_0; // the newer packet
   hart_to_encoder_ingress_t packet_1; // the older packet
@@ -110,6 +114,9 @@ private:
   int packet_to_buffer_program_trace_sync(trace_encoder_n_packet_t* packet);
   int packet_to_buffer_direct_branch_packet(trace_encoder_n_packet_t* packet);
   int packet_to_buffer_indirect_branch_packet(trace_encoder_n_packet_t* packet);
+
+  void print_ingress_csv_header();
+  void print_ingress_as_csv(hart_to_encoder_ingress_t* packet);
 };
 
 
