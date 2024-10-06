@@ -20,6 +20,7 @@ void trace_encoder_n::set_enable(bool enabled) {
 void trace_encoder_n::push_commit(hart_to_encoder_ingress_t packet) {
   this->packet_1 = this->packet_0;
   this->packet_0 = packet;
+  this->print_ingress_as_csv(&packet);
   if (this->enabled) {
     fprintf(this->debug_reference, "%lx\n", packet.i_addr);
     if (this->state == TRACE_ENCODER_N_IDLE) {
@@ -54,6 +55,14 @@ void print_encoded_packet(uint8_t* buffer, int num_bytes) {
     printf("%lx ", buffer[i]);
   }
   printf("\n");
+}
+
+void trace_encoder_n::print_ingress_csv_header() {
+  fprintf(this->ingress_log, "i_type,exc_cause,tval,priv,i_addr,iretire,ilastsize\n");
+}
+
+void trace_encoder_n::print_ingress_as_csv(hart_to_encoder_ingress_t* packet) {
+  fprintf(this->ingress_log, "%lx,%lx,%lx,%lx,%lx,%lx,%lx\n", packet->i_type, packet->exc_cause, packet->tval, packet->priv, packet->i_addr, packet->iretire, packet->ilastsize);
 }
 
 void trace_encoder_n::generate_packet(tcode_t tcode) {
