@@ -3,7 +3,7 @@
 #include "config.h"
 #include "processor.h"
 #include "trace_ingress.h"
-#include "trace_encoder_n.h"
+#include "trace_encoder_l.h"
 #include "mmu.h"
 #include "disasm.h"
 #include "decode_macros.h"
@@ -187,8 +187,9 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
         .i_addr = pc,
         .iretire = 1,
         .ilastsize = insn_length(fetch.insn.bits())/2,
+        .i_timestamp = p->get_state()->mcycle->read(),
       };
-      p->trace_encoder.push_commit(packet);
+      p->trace_encoder.push_ingress(packet);
     }
 
     if (npc != PC_SERIALIZE_BEFORE) {

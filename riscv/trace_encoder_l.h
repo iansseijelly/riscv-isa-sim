@@ -2,6 +2,7 @@
 #define _RISCV_TRACE_ENCODER_L_H
 
 #include "trace_ingress.h"
+#include "common.h"
 #include <stdio.h>
 
 class processor_t;
@@ -65,7 +66,15 @@ public:
   
 private:
   void _generate_sync_packet();
+  void _generate_direct_packet(f_header_t f_header);
+  void _generate_jump_uninferable_packet();
+  
+  int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
+  int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
+  int _encode_varlen(uint64_t value, uint8_t* buffer);
+  
   uint8_t buffer[MAX_TRACE_BUFFER_SIZE];
+  trace_encoder_l_packet_t packet;
   // trace files
   FILE* trace_sink;
   FILE* debug_reference;

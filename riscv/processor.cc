@@ -12,7 +12,7 @@
 #include "platform.h"
 #include "vector_unit.h"
 #include "debug_defines.h"
-#include "trace_encoder_n.h"
+#include "trace_encoder_l.h"
 #include <cinttypes>
 #include <cmath>
 #include <cstdlib>
