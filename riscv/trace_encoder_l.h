@@ -15,10 +15,10 @@ enum c_header_t {
 };
 
 enum f_header_t {
-	F_TB  = 0b000, // taken branch
-	F_NT  = 0b001, // non taken branch
+	F_TB   = 0b000, // taken branch
+	F_NT   = 0b001, // non taken branch
 	F_UJ   = 0b010, // uninferable jump
-	F_IJ  = 0b011, // inferable jump
+	F_IJ   = 0b011, // inferable jump
 	F_TRAP = 0b100, // trapping happened - could be interrupt or exception
 	F_SYNC = 0b101, // a synchronization packet
 	F_VAL  = 0b110, // this packets report a certain value upon request
@@ -87,7 +87,6 @@ private:
   trace_encoder_l_state_t state;
   // previous values
   uint64_t prev_timestamp;
-  uint64_t prev_address;
 };
 
 #endif
