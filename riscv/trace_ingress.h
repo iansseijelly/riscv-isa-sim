@@ -72,19 +72,19 @@ static inline bool _is_branch(insn_t* insn) {
   return CHECK_INSN(BEQ) || CHECK_INSN(BNE) || CHECK_INSN(BLT) || CHECK_INSN(BGE) || CHECK_INSN(BLTU) || CHECK_INSN(BGEU) || CHECK_INSN(C_BEQZ) || CHECK_INSN(C_BNEZ);
 }
 
-static inline bool _is_jal(insn_t* insn) {
-  return CHECK_INSN(JAL) || CHECK_INSN(C_JAL) || CHECK_INSN(C_J);
+static inline bool _is_jal(insn_t* insn, unsigned xlen) {
+  return CHECK_INSN(JAL) || (xlen == 32 && CHECK_INSN(C_JAL)) || CHECK_INSN(C_J);
 }
 
 static inline bool _is_jalr(insn_t* insn) {
   return CHECK_INSN(JALR) || CHECK_INSN(C_JALR) || CHECK_INSN(C_JR);
 }
 
-static inline insn_type _get_insn_type(insn_t* insn, bool taken) {
+static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) {
   if (_is_branch(insn)) {
     return taken ? I_BRANCH_TAKEN : I_BRANCH_NON_TAKEN;
   }
-  else if (_is_jal(insn)) {
+  else if (_is_jal(insn, xlen)) {
     return I_JUMP_INFERABLE;
   }
   else if (_is_jalr(insn)) {

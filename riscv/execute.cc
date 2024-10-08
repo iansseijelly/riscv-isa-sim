@@ -180,7 +180,7 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
 
     if (p->get_trace_enabled()) {
       hart_to_encoder_ingress_t packet {
-        .i_type = _get_insn_type(&fetch.insn, npc != p->get_state()->pc + insn_length(fetch.insn.bits())),
+        .i_type = _get_insn_type(&fetch.insn, npc != p->get_state()->pc + insn_length(fetch.insn.bits()), p->get_const_xlen()),
         .exc_cause = 0,
         .tval = 0,
         .priv = P_M, // TODO: check for processor privilege level
