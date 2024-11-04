@@ -61,6 +61,7 @@ public:
   }
   void reset();
   void set_enable(bool enabled);
+  bool get_enable();
   
   void push_ingress(hart_to_encoder_ingress_t packet);
   
