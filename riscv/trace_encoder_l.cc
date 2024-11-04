@@ -12,10 +12,13 @@ void trace_encoder_l::set_enable(bool enabled) {
   this->enabled = enabled;
 }
 
+bool trace_encoder_l::get_enable() {
+  return this->enabled;
+}
+
 void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   this->ingress_1 = this->ingress_0;
   this->ingress_0 = packet;
-  printf("ingress_0: %lx\n, i_type: %lx\n", packet.i_addr, packet.i_type);
   if (this->enabled) {
     fprintf(this->debug_reference, "%lx\n", packet.i_addr);
     if (this->state == TRACE_ENCODER_L_IDLE) {
