@@ -59,9 +59,9 @@ void trace_encoder_l::_generate_sync_packet() {
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
-  printf("[joint] %lx\n", this->ingress_0.i_addr);
-  print_packet(&this->packet);
-  print_encoded_packet(this->buffer, num_bytes);
+  // printf("[joint] %lx\n", this->ingress_0.i_addr);
+  // print_packet(&this->packet);
+  // print_encoded_packet(this->buffer, num_bytes);
 }
 
 void trace_encoder_l::_generate_direct_packet(f_header_t f_header) {
@@ -79,9 +79,9 @@ void trace_encoder_l::_generate_direct_packet(f_header_t f_header) {
     num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
     num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   }
-  printf("[joint] %lx\n", this->ingress_1.i_addr);
-  print_packet(&this->packet);
-  print_encoded_packet(this->buffer, num_bytes);
+  // printf("[joint] %lx\n", this->ingress_1.i_addr);
+  // print_packet(&this->packet);
+  // print_encoded_packet(this->buffer, num_bytes);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
 }
 
@@ -98,9 +98,9 @@ void trace_encoder_l::_generate_jump_uninferable_packet() {
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
   num_bytes += _encode_varlen(this->packet.address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
-  print_packet(&this->packet);
-  print_encoded_packet(this->buffer, num_bytes);
-  printf("[joint] %lx\n", this->ingress_1.i_addr);
+  // print_packet(&this->packet);
+  // print_encoded_packet(this->buffer, num_bytes);
+  // printf("[joint] %lx\n", this->ingress_1.i_addr);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
 }
 
