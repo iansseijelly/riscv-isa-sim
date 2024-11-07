@@ -545,6 +545,20 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
     if (state.mstatush) state.mstatush->write(s >> 32);  // log mstatush change
     state.tcontrol->write((state.tcontrol->read() & CSR_TCONTROL_MTE) ? CSR_TCONTROL_MPTE : 0);
     set_privilege(PRV_M, false);
+
+    if (unlikely(trace_enabled)) {
+      hart_to_encoder_ingress_t packet {
+        .i_type = interrupt ? I_INTERRUPT : I_EXCEPTION,
+        .exc_cause = t.cause(),
+        .tval = t.get_tval(),
+        .priv = static_cast<priv_enc>(state.prv),
+        .i_addr = epc,
+        .iretire = 1,
+        .ilastsize = insn_length(t.get_tinst())/2,
+        .i_timestamp = state.mcycle->read(),
+      };
+      trace_encoder.push_ingress(packet);
+    }
   }
 }
 

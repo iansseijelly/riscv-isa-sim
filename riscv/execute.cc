@@ -178,18 +178,20 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
   try {
     npc = fetch.func(p, fetch.insn, pc);
 
-    if (p->get_trace_enabled()) {
-      hart_to_encoder_ingress_t packet {
+    if (npc != PC_SERIALIZE_BEFORE) {
+      if (p->get_trace_enabled()) {
+        hart_to_encoder_ingress_t packet {
         .i_type = _get_insn_type(&fetch.insn, npc != p->get_state()->pc + insn_length(fetch.insn.bits()), p->get_const_xlen()),
         .exc_cause = 0,
         .tval = 0,
-        .priv = P_M, // TODO: check for processor privilege level
+        .priv = static_cast<priv_enc>(p->get_state()->prv),
         .i_addr = pc,
         .iretire = 1,
         .ilastsize = insn_length(fetch.insn.bits())/2,
         .i_timestamp = p->get_state()->mcycle->read(),
-      };
-      p->trace_encoder.push_ingress(packet);
+        };
+        p->trace_encoder.push_ingress(packet);
+      }
     }
 
     if (npc != PC_SERIALIZE_BEFORE) {

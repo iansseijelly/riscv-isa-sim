@@ -25,9 +25,17 @@ enum f_header_t {
 	F_RES  = 0b111, // reserved for now
 };
 
+enum trap_type_t {
+  T_NONE        = 0b000,
+  T_EXCEPTION   = 0b001,
+  T_INTERRUPT   = 0b010,
+  T_TRAP_RETURN = 0b100,
+};
+
 struct trace_encoder_l_packet_t {
   c_header_t c_header;
   f_header_t f_header;
+  trap_type_t trap_type;
   uint64_t address;
   uint64_t timestamp;
 };
@@ -69,7 +77,7 @@ private:
   void _generate_sync_packet();
   void _generate_direct_packet(f_header_t f_header);
   void _generate_jump_uninferable_packet();
-  
+  void _generate_trap_packet(trap_type_t trap_type);
   int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
   int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
   int _encode_varlen(uint64_t value, uint8_t* buffer);
