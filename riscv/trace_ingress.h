@@ -80,6 +80,10 @@ static inline bool _is_jalr(insn_t* insn) {
   return CHECK_INSN(JALR) || CHECK_INSN(C_JALR) || CHECK_INSN(C_JR);
 }
 
+static inline bool _is_mret(insn_t* insn) {
+  return CHECK_INSN(MRET);
+}
+
 static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) {
   if (_is_branch(insn)) {
     return taken ? I_BRANCH_TAKEN : I_BRANCH_NON_TAKEN;
@@ -89,6 +93,9 @@ static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) 
   }
   else if (_is_jalr(insn)) {
     return I_JUMP_UNINFERABLE;
+  }
+  else if (_is_mret(insn)) {
+    return I_TRAP_RETURN;
   }
   // TODO: further categorization is not implemented for now
   else {
