@@ -152,6 +152,9 @@ void processor_t::enable_log_commits()
 void processor_t::enable_trace()
 {
   trace_enabled = true;
+
+  // if trace flag is true, touch the file, otherwise leave it -- don't do in encoder ∵ encoder enable/disable toggles mid process
+  trace_encoder.init_trace_file();
 }
 
 void processor_t::reset()

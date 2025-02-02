@@ -59,14 +59,14 @@ c_header_t get_c_header(f_header_t f_header);
 class trace_encoder_l {
 public:
   trace_encoder_l() {
-    this->trace_sink = fopen("trace_l.bin", "wb");
-    this->debug_reference = fopen("trace_l_ref_debug.log", "wb");
     this->active = true;
     this->enabled = false;
     this->ingress_0 = hart_to_encoder_ingress_t();
     this->ingress_1 = hart_to_encoder_ingress_t();
     this->state = TRACE_ENCODER_L_IDLE;
   }
+  
+  void init_trace_file();
   void reset();
   void set_enable(bool enabled);
   bool get_enable();

@@ -7,4 +7,5 @@ autom4te.cache/
 .gdb_history
 .#*
 *~
-config.log
+*.log
+*.bin

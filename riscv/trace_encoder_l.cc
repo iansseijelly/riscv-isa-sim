@@ -16,6 +16,12 @@ bool trace_encoder_l::get_enable() {
   return this->enabled;
 }
 
+void trace_encoder_l::init_trace_file()
+{
+  this->trace_sink = fopen("trace_l.bin", "wb");
+  this->debug_reference = fopen("trace_l_ref_debug.log", "wb");
+}
+
 void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   this->ingress_1 = this->ingress_0;
   this->ingress_0 = packet;
