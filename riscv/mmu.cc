@@ -241,8 +241,10 @@ void mmu_t::load_slow_path(reg_t original_addr, reg_t len, uint8_t* bytes, xlate
 
     reg_t len_page0 = std::min(len, PGSIZE - transformed_addr % PGSIZE);
     load_slow_path_intrapage(len_page0, bytes, access_info);
-    if (len_page0 != len)
-      load_slow_path_intrapage(len - len_page0, bytes + len_page0, access_info.split_misaligned_access(len_page0));
+    if (len_page0 != len) {
+      auto tail_access_info = generate_access_info(original_addr + len_page0, LOAD, xlate_flags);
+      load_slow_path_intrapage(len - len_page0, bytes + len_page0, tail_access_info);
+    }
   }
 
   while (len > sizeof(reg_t)) {
@@ -306,8 +308,10 @@ void mmu_t::store_slow_path(reg_t original_addr, reg_t len, const uint8_t* bytes
 
     reg_t len_page0 = std::min(len, PGSIZE - transformed_addr % PGSIZE);
     store_slow_path_intrapage(len_page0, bytes, access_info, actually_store);
-    if (len_page0 != len)
-      store_slow_path_intrapage(len - len_page0, bytes + len_page0, access_info.split_misaligned_access(len_page0), actually_store);
+    if (len_page0 != len) {
+      auto tail_access_info = generate_access_info(original_addr + len_page0, STORE, xlate_flags);
+      store_slow_path_intrapage(len - len_page0, bytes + len_page0, tail_access_info, actually_store);
+    }
   } else {
     store_slow_path_intrapage(len, bytes, access_info, actually_store);
   }
@@ -453,6 +457,10 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
       } else {
         reg_t ad = PTE_A | ((type == STORE) * PTE_D);
 
+        int napot_bits = ((pte & PTE_N) ? (ctz(ppn) + 1) : 0);
+        if (((pte & PTE_N) && (ppn == 0 || i != 0)) || (napot_bits != 0 && napot_bits != 4))
+          break;
+
         if ((pte & ad) != ad) {
           if (hade) {
             // set accessed and possibly dirty bits
@@ -465,10 +473,6 @@ reg_t mmu_t::s2xlate(reg_t gva, reg_t gpa, access_type type, access_type trap_ty
 
         reg_t vpn = gpa >> PGSHIFT;
         reg_t page_mask = (reg_t(1) << PGSHIFT) - 1;
-
-        int napot_bits = ((pte & PTE_N) ? (ctz(ppn) + 1) : 0);
-        if (((pte & PTE_N) && (ppn == 0 || i != 0)) || (napot_bits != 0 && napot_bits != 4))
-          break;
 
         reg_t page_base = ((ppn & ~((reg_t(1) << napot_bits) - 1))
                           | (vpn & ((reg_t(1) << napot_bits) - 1))
@@ -553,8 +557,10 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
       // not shadow stack access xwr=110 or xwr=010 page cause page fault
       // shadow stack access with PTE_X moved to following check
       break;
-    } else if (ss_page && (type == STORE && !ss_access)) {
-      // not shadow stack store and  xwr = 010 cause access-fault
+    } else if ((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
+      break;
+    } else if (ss_page && ((type == STORE && !ss_access) || access_info.flags.clean_inval)) {
+      // non-shadow-stack store or CBO with xwr = 010 causes access-fault
       throw trap_store_access_fault(virt, addr, 0, 0);
     } else if (ss_page && type == FETCH) {
       // fetch from shadow stack pages cause instruction access-fault
@@ -566,10 +572,12 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
                type == LOAD          ? !(sse && ss_page) && !(pte & PTE_R) && !(mxr && (pte & PTE_X)) :
                                        !(pte & PTE_W)) {
       break;
-    } else if ((ppn & ((reg_t(1) << ptshift) - 1)) != 0) {
-      break;
     } else {
       reg_t ad = PTE_A | ((type == STORE) * PTE_D);
+
+      int napot_bits = ((pte & PTE_N) ? (ctz(ppn) + 1) : 0);
+      if (((pte & PTE_N) && (ppn == 0 || i != 0)) || (napot_bits != 0 && napot_bits != 4))
+        break;
 
       if ((pte & ad) != ad) {
         if (hade) {
@@ -586,10 +594,6 @@ reg_t mmu_t::walk(mem_access_info_t access_info)
 
       // for superpage or Svnapot NAPOT mappings, make a fake leaf PTE for the TLB's benefit.
       reg_t vpn = addr >> PGSHIFT;
-
-      int napot_bits = ((pte & PTE_N) ? (ctz(ppn) + 1) : 0);
-      if (((pte & PTE_N) && (ppn == 0 || i != 0)) || (napot_bits != 0 && napot_bits != 4))
-        break;
 
       reg_t page_base = ((ppn & ~((reg_t(1) << napot_bits) - 1))
                         | (vpn & ((reg_t(1) << napot_bits) - 1))
@@ -614,7 +618,7 @@ void mmu_t::register_memtracer(memtracer_t* t)
 }
 
 reg_t mmu_t::get_pmlen(bool effective_virt, reg_t effective_priv, xlate_flags_t flags) const {
-  if (!proc || proc->get_xlen() != 64 || (in_mprv() && (proc->state.sstatus->read() & MSTATUS_MXR)) || flags.hlvx)
+  if (!proc || proc->get_xlen() != 64 || ((proc->state.sstatus->readvirt(false) | proc->state.sstatus->readvirt(effective_virt)) & MSTATUS_MXR) || flags.hlvx)
     return 0;
 
   reg_t pmm = 0;

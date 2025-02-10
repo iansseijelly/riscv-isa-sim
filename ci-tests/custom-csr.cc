@@ -1,52 +1,43 @@
 #include <riscv/extension.h>
 #include <riscv/sim.h>
 
-struct : public arg_t {
-  std::string to_string(insn_t insn) const { return xpr_name[insn.rd()]; }
-} xrd;
 
-struct : public arg_t {
-  std::string to_string(insn_t insn) const { return xpr_name[insn.rs1()]; }
-} xrs1;
+class dummycsr_t: public csr_t {
+  public:
+  dummycsr_t(processor_t *proc, const reg_t addr): csr_t(proc, addr) {}
 
-struct : public arg_t {
-  std::string to_string(insn_t insn) const { return xpr_name[insn.rs2()]; }
-} xrs2;
-
-struct : public arg_t {
-  std::string to_string(insn_t insn) const {
-    return std::to_string((int)insn.shamt());
-  }
-} shamt;
-
-static reg_t do_nop4([[maybe_unused]] processor_t *p,
-                     [[maybe_unused]] insn_t insn, reg_t pc) {
-  return pc + 4;
-}
-
-// dummy extension that uses the same prefix as standard zba extension
-struct xslliuw_dummy_t : public extension_t {
-  const char *name() { return "dummyslliuw"; }
-
-  xslliuw_dummy_t() {}
-
-  std::vector<insn_desc_t> get_instructions() {
-    std::vector<insn_desc_t> insns;
-    insns.push_back(insn_desc_t{MATCH_SLLI_UW, MASK_SLLI_UW, do_nop4, do_nop4,
-                                do_nop4, do_nop4, do_nop4, do_nop4, do_nop4,
-                                do_nop4});
-    return insns;
+  reg_t read() const noexcept override {
+    return 42;
   }
 
-  std::vector<disasm_insn_t *> get_disasms() {
-    std::vector<disasm_insn_t *> insns;
-    insns.push_back(new disasm_insn_t("dummy_slliuw", MATCH_SLLI_UW,
-                                      MASK_SLLI_UW, {&xrd, &xrs1, &shamt}));
-    return insns;
+  void verify_permissions(insn_t insn, bool write) const override {}
+
+  protected:
+  bool unlogged_write(const reg_t val) noexcept override {
+    return true;
   }
 };
 
-REGISTER_EXTENSION(dummyslliuw, []() { return new xslliuw_dummy_t; })
+// dummy extension with dummy CSRs. Nice.
+struct xdummycsr_t : public extension_t {
+  const char *name() { return "dummycsr"; }
+
+  xdummycsr_t() {}
+
+  std::vector<insn_desc_t> get_instructions() override {
+    return {};
+  }
+
+  std::vector<disasm_insn_t *> get_disasms() override {
+    return {};
+  }
+
+  std::vector<csr_t_p> get_csrs(processor_t &proc) const override {
+    return {std::make_shared<dummycsr_t>(&proc, /*Addr*/ 0xfff)};
+  }
+};
+
+REGISTER_EXTENSION(dummycsr, []() { return new xdummycsr_t; })
 
 // Copied from spike main.
 // TODO: This should really be provided in libriscv
@@ -62,7 +53,7 @@ make_mems(const std::vector<mem_cfg_t> &layout) {
 
 int main(int argc, char **argv) {
   cfg_t cfg;
-  cfg.isa = "RV64IMAFDCV_xdummyslliuw";
+  cfg.isa = "RV64IMAFDCV_Zicsr_xdummycsr";
   std::vector<device_factory_sargs_t> plugin_devices;
   if (argc != 3) {
     std::cerr << "Error: invalid arguments\n";

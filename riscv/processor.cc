@@ -195,8 +195,6 @@ void processor_t::reset()
 {
   xlen = isa.get_max_xlen();
   state.reset(this, isa.get_max_isa());
-  state.dcsr->halt = halt_on_reset;
-  halt_on_reset = false;
   if (any_vector_extensions())
     VU.reset();
   in_wfi = false;
@@ -208,8 +206,11 @@ void processor_t::reset()
     put_csr(CSR_PMPCFG0, PMP_R | PMP_W | PMP_X | PMP_NAPOT);
   }
 
-  for (auto e : custom_extensions) // reset any extensions
+  for (auto e : custom_extensions) { // reset any extensions
+    for (auto &csr: e.second->get_csrs(*this))
+      state.add_csr(csr->address, csr);
     e.second->reset();
+  }
 
   if (sim)
     sim->proc_reset(id);
@@ -317,8 +318,8 @@ void processor_t::take_interrupt(reg_t pending_interrupts)
   const bool nmie = !(state.mnstatus && !get_field(state.mnstatus->read(), MNSTATUS_NMIE));
   if (!state.debug_mode && nmie && enabled_interrupts) {
     // nonstandard interrupts have highest priority
-    if (enabled_interrupts >> (IRQ_M_EXT + 1))
-      enabled_interrupts = enabled_interrupts >> (IRQ_M_EXT + 1) << (IRQ_M_EXT + 1);
+    if (enabled_interrupts >> (IRQ_LCOF + 1))
+      enabled_interrupts = enabled_interrupts >> (IRQ_LCOF + 1) << (IRQ_LCOF + 1);
     // standard interrupt priority is MEI, MSI, MTI, SEI, SSI, STI
     else if (enabled_interrupts & MIP_MEIP)
       enabled_interrupts = MIP_MEIP;
@@ -457,7 +458,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
   // An unexpected trap - a trap when SDT is 1 - traps to M-mode
   if ((state.prv <= PRV_S && bit < max_xlen) &&
       (((vsdeleg >> bit) & 1)  || ((hsdeleg >> bit) & 1))) {
-    reg_t s = curr_virt ? state.nonvirtual_sstatus->read() : state.sstatus->read();
+    reg_t s = state.sstatus->read();
     supv_double_trap = get_field(s, MSTATUS_SDT);
     if (supv_double_trap)
       vsdeleg = hsdeleg = 0;
@@ -546,7 +547,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
     state.elp = elp_t::NO_LP_EXPECTED;
     state.mstatus->write(s);
     if (state.mstatush) state.mstatush->write(s >> 32);  // log mstatush change
-    state.tcontrol->write((state.tcontrol->read() & CSR_TCONTROL_MTE) ? CSR_TCONTROL_MPTE : 0);
+    if (state.tcontrol) state.tcontrol->write((state.tcontrol->read() & CSR_TCONTROL_MTE) ? CSR_TCONTROL_MPTE : 0);
     set_privilege(PRV_M, false);
 
     if (unlikely(trace_enabled)) {
