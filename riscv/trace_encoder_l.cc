@@ -18,15 +18,15 @@ bool trace_encoder_l::get_enable() {
 
 void trace_encoder_l::init_trace_file()
 {
-  this->trace_sink = fopen("trace_l.bin", "wb");
-  this->debug_reference = fopen("trace_l_ref_debug.log", "wb");
+  this->trace_sink = fopen("tacit.out", "wb");
+  this->trace_log = fopen("tacit.log", "wb");
+  this->debug_reference = fopen("tacit.debug", "wb");
 }
 
 void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   this->ingress_1 = this->ingress_0;
   this->ingress_0 = packet;
   if (this->enabled) {
-    // fprintf(this->debug_reference, "%lx\n", packet.i_addr);
     fprintf(this->debug_reference, "%lx, %d\n", packet.i_addr, packet.i_type);
     if (this->state == TRACE_ENCODER_L_IDLE) {
       _generate_sync_packet();
@@ -73,9 +73,7 @@ void trace_encoder_l::_generate_sync_packet() {
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
-  // printf("[joint] %lx\n", this->ingress_0.i_addr);
-  print_packet(&this->packet);
-  // print_encoded_packet(this->buffer, num_bytes);
+  _log_packet(&this->packet);
 }
 
 void trace_encoder_l::_generate_direct_packet(f_header_t f_header) {
@@ -83,6 +81,7 @@ void trace_encoder_l::_generate_direct_packet(f_header_t f_header) {
   this->prev_timestamp = this->ingress_1.i_timestamp;
   int msb = find_msb(delta_timestamp);
   bool is_compressed = msb < MAX_COMPRESS_DELTA;
+  this->packet.address = 0; // explicitly set to 0 to avoid confusion
   this->packet.timestamp = delta_timestamp;
   this->packet.c_header = is_compressed ? get_c_header(f_header) : C_NA;
   this->packet.f_header = f_header;
@@ -94,10 +93,8 @@ void trace_encoder_l::_generate_direct_packet(f_header_t f_header) {
     num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
     num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   }
-  // printf("[joint] %lx\n", this->ingress_1.i_addr);
-  print_packet(&this->packet);
-  // print_encoded_packet(this->buffer, num_bytes);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
+  _log_packet(&this->packet);
 }
 
 void trace_encoder_l::_generate_jump_uninferable_packet() {
@@ -114,7 +111,7 @@ void trace_encoder_l::_generate_jump_uninferable_packet() {
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
   num_bytes += _encode_varlen(this->packet.address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
-  print_packet(&this->packet);
+  _log_packet(&this->packet);
   // print_encoded_packet(this->buffer, num_bytes);
   // printf("[joint] %lx\n", this->ingress_1.i_addr);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
@@ -134,7 +131,7 @@ void trace_encoder_l::_generate_trap_packet(trap_type_t trap_type) {
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
   num_bytes += _encode_varlen(this->packet.address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
-  print_packet(&this->packet);
+  _log_packet(&this->packet);
   // print_encoded_packet(this->buffer, num_bytes);
   // printf("[joint] %lx\n", this->ingress_1.i_addr);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
@@ -180,8 +177,8 @@ c_header_t get_c_header(f_header_t f_header) {
   else return C_NA;
 }
 
-void print_packet(trace_encoder_l_packet_t* packet) {
-  printf("c_header: %d, f_header: %d, trap_type: %d, address: %lx, timestamp: %lx\n", packet->c_header, packet->f_header, packet->trap_type, packet->address, packet->timestamp);
+void trace_encoder_l::_log_packet(trace_encoder_l_packet_t* packet) {
+  fprintf(this->trace_log, "c_header: %d, f_header: %d, trap_type: %d, address: %lx, timestamp: %lx\n", packet->c_header, packet->f_header, packet->trap_type, packet->address, packet->timestamp);
 }
 
 void print_encoded_packet(uint8_t* buffer, int num_bytes) {
