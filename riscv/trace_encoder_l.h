@@ -48,7 +48,6 @@ enum trace_encoder_l_state_t {
 #define MAX_TRACE_BUFFER_SIZE 32
 #define MAX_COMPRESS_DELTA 6
 
-void print_packet(trace_encoder_l_packet_t* packet);
 void print_encoded_packet(uint8_t* buffer, int num_bytes);
 
 int find_msb(uint64_t x);
@@ -81,11 +80,13 @@ private:
   int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
   int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
   int _encode_varlen(uint64_t value, uint8_t* buffer);
+  void _log_packet(trace_encoder_l_packet_t* packet);
   
   uint8_t buffer[MAX_TRACE_BUFFER_SIZE];
   trace_encoder_l_packet_t packet;
   // trace files
   FILE* trace_sink;
+  FILE* trace_log;
   FILE* debug_reference;
   // ingress packets
   hart_to_encoder_ingress_t ingress_0;
