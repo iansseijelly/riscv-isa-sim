@@ -166,7 +166,7 @@ static inline reg_t execute_insn_fast(processor_t* p, reg_t pc, insn_fetch_t fet
   return fetch.func(p, fetch.insn, pc);
 }
 
-static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t fetch, size_t instret)
+static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t fetch)
 {
   if (p->get_log_commits_enabled()) {
     commit_log_reset(p);
@@ -188,8 +188,7 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
         .i_addr = pc,
         .iretire = 1,
         .ilastsize = insn_length(fetch.insn.bits())/2,
-        // .i_timestamp = p->get_state()->mcycle->read(),
-        .i_timestamp = instret,
+        .i_timestamp = p->total_insn_count,
         };
         p->trace_encoder.push_ingress(packet);
       }
@@ -263,6 +262,7 @@ void processor_t::step(size_t n)
       } else { \
         state.pc = pc; \
         instret++; \
+        total_insn_count++; \
       }
 
     try
@@ -306,7 +306,7 @@ void processor_t::step(size_t n)
           insn_fetch_t fetch = mmu->load_insn(pc);
           if (debug && !state.serialized)
             disasm(fetch.insn);
-          pc = execute_insn_logged(this, pc, fetch, instret);
+          pc = execute_insn_logged(this, pc, fetch);
           advance_pc();
 
           // Resume from debug mode in critical error

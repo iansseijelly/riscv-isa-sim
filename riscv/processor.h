@@ -440,6 +440,7 @@ public:
   vectorUnit_t VU;
   triggers::module_t TM;
   trace_encoder_l trace_encoder;
+  size_t total_insn_count;
 };
 
 #endif
