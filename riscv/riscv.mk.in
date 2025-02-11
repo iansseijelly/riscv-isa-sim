@@ -46,6 +46,8 @@ riscv_install_hdrs = \
 	vector_unit.h \
 	trace_ingress.h \
 	trace_encoder_l.h \
+	branch_predictor.h \
+	bp_double_saturating_counter.h \
 
 riscv_precompiled_hdrs = \
 	insn_template.h \
@@ -76,6 +78,7 @@ riscv_srcs = \
 	socketif.cc \
 	cfg.cc \
 	trace_encoder_l.cc \
+	bp_double_saturating_counter.cc \
 	$(riscv_gen_srcs) \
 
 riscv_test_srcs = \
