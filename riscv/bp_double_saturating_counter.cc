@@ -13,7 +13,7 @@ void bp_double_saturating_counter_t::reset() {
 
 bool bp_double_saturating_counter_t::predict(reg_t pc, bool taken) {
   // get the index of the counter for this pc
-  int index = pc % num_entries;
+  int index = (pc >> 1) % num_entries;
   // get the current counter value
   enum branch_prediction_t counter_value = counters[index];
   // update the counter
@@ -24,6 +24,13 @@ bool bp_double_saturating_counter_t::predict(reg_t pc, bool taken) {
   }
   // return whether the prediction hit or miss
   return is_taken(counter_value) == taken;
+}
+
+branch_prediction_t bp_double_saturating_counter_t::peek(reg_t pc) {
+  // get the index of the counter for this pc
+  int index = (pc >> 1) % num_entries;
+  // return the current counter value
+  return counters[index];
 }
 
 const branch_prediction_t bp_double_saturating_counter_t::increment_table[] = {

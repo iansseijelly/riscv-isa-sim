@@ -99,6 +99,7 @@ private:
   int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
   int _encode_varlen(uint64_t value, uint8_t* buffer);
   void _log_packet(trace_encoder_l_packet_t* packet);
+  void _log_prediction(bool prediction, bool hit);
   void _bt_mode_data_step();
   void _bp_mode_data_step();
   uint8_t buffer[MAX_TRACE_BUFFER_SIZE];
@@ -118,7 +119,7 @@ private:
   // previous values
   uint64_t prev_timestamp;
   // branch predictor
-  branch_predictor_t* bp;
+  bp_double_saturating_counter_t* bp;
   size_t hit_count;
   bool miss_flag;
 };
