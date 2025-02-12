@@ -89,7 +89,7 @@ void trace_encoder_l::_bp_mode_data_step() {
   // stage 0: branch prediction
   switch (this->ingress_0.i_type) {
     case I_BRANCH_TAKEN:
-      if (this->bp->predict(this->ingress_1.i_addr, true)) {
+      if (this->bp->predict(this->ingress_0.i_addr, true)) {
         this->hit_count++;
       } else {
         send_hit_packet_flag = true;
@@ -97,7 +97,7 @@ void trace_encoder_l::_bp_mode_data_step() {
       }
       break;
     case I_BRANCH_NON_TAKEN:
-      if (this->bp->predict(this->ingress_1.i_addr, false)) {
+      if (this->bp->predict(this->ingress_0.i_addr, false)) {
         this->hit_count++;
       } else {
         send_hit_packet_flag = true;
@@ -298,7 +298,15 @@ c_header_t get_c_header(f_header_t f_header) {
 }
 
 void trace_encoder_l::_log_packet(trace_encoder_l_packet_t* packet) {
-  fprintf(this->trace_log, "c_header: %d, f_header: %d, trap_type: %d, address: %lx, timestamp: %lx\n", packet->c_header, packet->f_header, packet->trap_type, packet->address, packet->timestamp);
+  fprintf(this->trace_log, "[Packet]: c_header: %d, f_header: %d, trap_type: %d, address: %lx, timestamp: %lx\n", packet->c_header, packet->f_header, packet->trap_type, packet->address, packet->timestamp);
+}
+
+void trace_encoder_l::_log_prediction(bool prediction, bool hit) {
+  fprintf(this->trace_log, "[BP]: PC: %lx, prediction: %s, hit: %s, counter: %d\n", 
+          this->ingress_0.i_addr,
+          prediction ? "Taken" : "Not Taken", 
+          hit ? "Hit" : "Miss",
+          static_cast<int>(this->bp->peek(this->ingress_0.i_addr)));
 }
 
 void print_encoded_packet(uint8_t* buffer, int num_bytes) {

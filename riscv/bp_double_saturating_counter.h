@@ -11,14 +11,12 @@ enum branch_prediction_t {
   STRONG_TAKEN = 3
 };
 
-
-
 class bp_double_saturating_counter_t : public branch_predictor_t {
 public:
   bp_double_saturating_counter_t(int num_entries);
   void reset();
   bool predict(reg_t pc, bool taken);
-
+  branch_prediction_t peek(reg_t pc);
 private:
   int num_entries;
   std::vector<branch_prediction_t> counters;
