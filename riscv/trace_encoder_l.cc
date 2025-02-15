@@ -167,8 +167,6 @@ void trace_encoder_l::_generate_sync_packet() {
   // encode the packet
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer);
-  // metadata
-  num_bytes += _encode_varlen(static_cast<uint64_t>(this->br_mode), this->buffer + num_bytes);
   // initial state
   num_bytes += _encode_varlen(this->packet.address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
