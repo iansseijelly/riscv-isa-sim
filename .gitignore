@@ -9,3 +9,4 @@ autom4te.cache/
 *~
 *.log
 *.bin
+config.log
