@@ -105,7 +105,7 @@ void trace_encoder_l::_bp_mode_data_step() {
       }
       break;
     // all other non-NONE instructions
-    case I_JUMP_INFERABLE:
+    // case I_JUMP_INFERABLE:
     case I_JUMP_UNINFERABLE:
     case I_EXCEPTION:
     case I_INTERRUPT:
@@ -120,6 +120,7 @@ void trace_encoder_l::_bp_mode_data_step() {
     // assert that ingress_1.i_type is not a packet-generating instruction
     assert(this->ingress_1.i_type == I_BRANCH_TAKEN ||
            this->ingress_1.i_type == I_BRANCH_NON_TAKEN ||
+           this->ingress_1.i_type == I_JUMP_INFERABLE ||
            this->ingress_1.i_type == I_NONE);
     // assert that miss_flag is not set
     assert(!this->miss_flag);
@@ -133,9 +134,9 @@ void trace_encoder_l::_bp_mode_data_step() {
     _generate_direct_packet(F_MISS);
   } else {
     switch (this->ingress_1.i_type) {
-      case I_JUMP_INFERABLE:
-        _generate_direct_packet(F_IJ);
-        break;
+      // case I_JUMP_INFERABLE:
+      //   _generate_direct_packet(F_IJ);
+      //   break;
       case I_JUMP_UNINFERABLE:
         _generate_jump_uninferable_packet();
         break;

@@ -1,5 +1,5 @@
 #include "bp_double_saturating_counter.h"
-
+#include <stdio.h>
 bp_double_saturating_counter_t::bp_double_saturating_counter_t(int num_entries) {
   // allocate and initialize the counters
   this->counters = std::vector<branch_prediction_t>(num_entries, WEAK_NOT_TAKEN);
