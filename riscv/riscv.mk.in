@@ -48,6 +48,7 @@ riscv_install_hdrs = \
 	vector_unit.h \
 	trace_ingress.h \
 	trace_encoder_l.h \
+	trace_encoder_e.h \
 	branch_predictor.h \
 	bp_double_saturating_counter.h \
 
@@ -80,6 +81,7 @@ riscv_srcs = \
 	socketif.cc \
 	cfg.cc \
 	trace_encoder_l.cc \
+	trace_encoder_e.cc \
 	bp_double_saturating_counter.cc \
 	$(riscv_gen_srcs) \
 
