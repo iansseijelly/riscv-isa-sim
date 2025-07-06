@@ -1,7 +1,7 @@
 #ifndef _RISCV_TRACE_ENCODER_L_H
 #define _RISCV_TRACE_ENCODER_L_H
 
-#include "trace_ingress.h"
+#include "abstract_trace_encoder.h"
 #include "common.h"
 #include "branch_predictor.h"
 #include "bp_double_saturating_counter.h"
@@ -9,13 +9,6 @@
 #include <cassert>
 
 class processor_t;
-
-enum br_mode_t {
-	BR_TARG = 0b00, // branch target mode
-	BR_HIST = 0b01, // branch history mode
-	BR_PRED = 0b10, // branch prediction mode
-	BR_RSVD = 0b11, // reserved
-};
 
 enum c_header_t {
 	C_TB = 0b00,   // taken branch
@@ -69,7 +62,7 @@ int ceil_div(int a, int b);
 int encode_varlen(uint64_t value, uint8_t* buffer);
 c_header_t get_c_header(f_header_t f_header);
 
-class trace_encoder_l {
+class trace_encoder_l : public abstract_trace_encoder_t {
 public:
   trace_encoder_l() {
     this->active = true;
@@ -80,14 +73,14 @@ public:
     this->bp = new bp_double_saturating_counter_t(1024);
   }
   
-  void init_trace_file();
-  void reset();
-  void set_enable(bool enabled);
-  bool get_enable();
-  void set_br_mode(br_mode_t br_mode);
+  void init_trace_file() override;
+  void reset() override;
+  void set_enable(bool enabled) override;
+  bool get_enable() override;
+  void set_br_mode(br_mode_t br_mode) override;
   br_mode_t get_br_mode();
   
-  void push_ingress(hart_to_encoder_ingress_t packet);
+  void push_ingress(hart_to_encoder_ingress_t packet) override;
   
 private:
   void _generate_sync_packet();

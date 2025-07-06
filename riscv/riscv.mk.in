@@ -45,6 +45,7 @@ riscv_install_hdrs = \
 	triggers.h \
 	vector_unit.h \
 	trace_ingress.h \
+	abstract_trace_encoder.h \
 	trace_encoder_l.h \
 	trace_encoder_e.h \
 	branch_predictor.h \
