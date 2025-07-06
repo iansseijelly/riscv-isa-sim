@@ -3,7 +3,7 @@
 #include "config.h"
 #include "processor.h"
 #include "trace_ingress.h"
-#include "trace_encoder_l.h"
+#include "trace_encoder_e.h"
 #include "mmu.h"
 #include "disasm.h"
 #include "decode_macros.h"
