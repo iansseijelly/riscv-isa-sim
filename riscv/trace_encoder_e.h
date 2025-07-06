@@ -1,26 +1,17 @@
 #ifndef _RISCV_TRACE_ENCODER_E_H
 #define _RISCV_TRACE_ENCODER_E_H
 
-#include <stdio.h>
-
-#include <cassert>
-#include <variant>
-#include <vector>
-#include <string>
-
-#include "bp_double_saturating_counter.h"
-#include "branch_predictor.h"
+#include "abstract_trace_encoder.h"
 #include "common.h"
-#include "trace_ingress.h"
+#include "branch_predictor.h"
+#include "bp_double_saturating_counter.h"
+#include <stdio.h>
+#include <cassert>
+#include <string>
+#include <vector>
+#include <variant>
 
 class processor_t;
-
-enum br_mode_t {
-    BR_TARG = 0b00,  // branch target mode
-    BR_HIST = 0b01,  // branch history mode
-    BR_PRED = 0b10,  // branch prediction mode
-    BR_RSVD = 0b11,  // reserved
-};
 
 enum fmt_t {
     FMT_3 = 0b11,
@@ -76,7 +67,7 @@ using trace_encoder_e_packet_t = std::variant<sync_packet_t, branch_map_packet_t
 #define MAX_TRACE_BUFFER_SIZE 32
 #define MAX_COMPRESS_DELTA 6
 
-class trace_encoder_e {
+class trace_encoder_e : public abstract_trace_encoder_t {
    public:
     trace_encoder_e() {
         this->active = true;
@@ -88,12 +79,12 @@ class trace_encoder_e {
         this->branches = 0;
         this->buffer.clear();
     }
-    void reset();
-    void set_enable(bool enabled);
-    bool get_enable();
-    void set_br_mode(br_mode_t br_mode);
-    void init_trace_file();
-    void push_ingress(hart_to_encoder_ingress_t packet);
+    void reset() override;
+    void set_enable(bool enabled) override;
+    bool get_enable() override;
+    void set_br_mode(br_mode_t br_mode) override;
+    void init_trace_file() override;
+    void push_ingress(hart_to_encoder_ingress_t packet) override;
 
    private:
     void _bt_mode_data_step();

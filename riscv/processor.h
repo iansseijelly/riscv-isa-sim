@@ -17,7 +17,7 @@
 #include "triggers.h"
 #include "../fesvr/memif.h"
 #include "vector_unit.h"
-#include "trace_encoder_e.h"
+#include "abstract_trace_encoder.h"
 
 #define FIRST_HPMCOUNTER 3
 #define N_HPMCOUNTERS 29
@@ -384,7 +384,7 @@ public:
   void check_if_lpad_required();
 
   reg_t select_an_interrupt_with_default_priority(reg_t enabled_interrupts) const;
-  trace_encoder_e* get_trace_encoder() { return &trace_encoder; }
+  abstract_trace_encoder_t* get_trace_encoder() { return &trace_encoder; }
 
 private:
   const isa_parser_t isa;
@@ -454,7 +454,7 @@ public:
 
   vectorUnit_t VU;
   triggers::module_t TM;
-  trace_encoder_e trace_encoder;
+  abstract_trace_encoder_t trace_encoder;
   size_t total_insn_count;
 };
 
