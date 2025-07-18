@@ -77,6 +77,8 @@ class trace_encoder_e : public abstract_trace_encoder_t {
         this->state = TRACE_ENCODER_E_IDLE;
         this->br_mode = BR_TARG;
         this->branches = 0;
+        this->branch_map.resize(31);
+        this->buffer.resize(256);
         this->buffer.clear();
     }
     void reset() override;
@@ -89,9 +91,9 @@ class trace_encoder_e : public abstract_trace_encoder_t {
    private:
     void _bt_mode_data_step();
     void _update_branch_map(bool taken);
-    void _generate_sync_packet(subfmt_t subfmt, bool thaddr, uint8_t exception);
+    void _generate_sync_packet(subfmt_t subfmt, bool thaddr);
     void _generate_branch_packet(bool taken);
-    uint8_t _encode_sync_packet(subfmt_t subfmt);
+    uint8_t _encode_sync_packet();
     uint8_t _encode_branch_packet();
     uint8_t _encode_varlen(uint64_t value, uint8_t num_bytes);
     uint32_t _convert_branch_map();
@@ -113,7 +115,7 @@ class trace_encoder_e : public abstract_trace_encoder_t {
     bool enabled;
     trace_encoder_e_state_t state;
     br_mode_t br_mode;
-    uint8_t branches;
+    int branches;
     std::vector<bool> branch_map;
     // previous values
     uint64_t prev_timestamp;
