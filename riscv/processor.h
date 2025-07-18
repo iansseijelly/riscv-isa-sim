@@ -18,6 +18,8 @@
 #include "../fesvr/memif.h"
 #include "vector_unit.h"
 #include "abstract_trace_encoder.h"
+#include "trace_encoder_e.h"
+#include "trace_encoder_l.h"
 
 #define FIRST_HPMCOUNTER 3
 #define N_HPMCOUNTERS 29
@@ -439,7 +441,7 @@ public:
 
   vectorUnit_t VU;
   triggers::module_t TM;
-  abstract_trace_encoder_t trace_encoder;
+  trace_encoder_e trace_encoder;
   size_t total_insn_count;
 };
 
