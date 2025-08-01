@@ -1,15 +1,17 @@
 #ifndef _RISCV_TRACE_ENCODER_E_H
 #define _RISCV_TRACE_ENCODER_E_H
 
-#include "abstract_trace_encoder.h"
-#include "common.h"
-#include "branch_predictor.h"
-#include "bp_double_saturating_counter.h"
 #include <stdio.h>
+
 #include <cassert>
 #include <string>
-#include <vector>
 #include <variant>
+#include <vector>
+
+#include "abstract_trace_encoder.h"
+#include "bp_double_saturating_counter.h"
+#include "branch_predictor.h"
+#include "common.h"
 
 class processor_t;
 
@@ -22,6 +24,8 @@ enum fmt_t {
 enum subfmt_t {
     SUBFMT_START = 0b00,
     SUBFMT_TRAP = 0b01,
+    SUBFMT_CONTEXT = 0b10,
+    SUBFMT_SUPPORT = 0b11
 };
 
 enum ecause_t {
@@ -57,6 +61,29 @@ struct branch_map_packet_t {
     // uint64_t irdepth;
 };
 
+struct flags_t {
+    bool notify;
+    bool prev_updiscon;
+    bool curr_updiscon;
+    bool updiscon;
+    bool irreport;
+    bool irdepth;
+    bool prev_exception;
+    bool curr_exception;
+    bool curr_exc_only;
+    bool next_exc_only;
+    bool next_exception;
+    bool prev_reported;
+    bool first_qualified;
+    bool ppccd;
+    bool ppccd_br;
+    bool er_n;
+    bool resync_br;
+    bool rpt_br;
+    bool resync_exceeded;
+    // bool 
+};
+
 enum trace_encoder_e_state_t {
     TRACE_ENCODER_E_IDLE,
     TRACE_ENCODER_E_DATA,
@@ -64,19 +91,24 @@ enum trace_encoder_e_state_t {
 
 using trace_encoder_e_packet_t = std::variant<sync_packet_t, branch_map_packet_t>;
 
-#define MAX_TRACE_BUFFER_SIZE 32
+#define MAX_TRACE_BUFFER_SIZE 256
 #define MAX_COMPRESS_DELTA 6
+#define RESYNC_MAX 32
+#define MAX_BRANCHES 31
 
 class trace_encoder_e : public abstract_trace_encoder_t {
    public:
     trace_encoder_e() {
         this->active = true;
         this->enabled = false;
-        this->ingress_0 = hart_to_encoder_ingress_t();
-        this->ingress_1 = hart_to_encoder_ingress_t();
+        this->next_ingress = hart_to_encoder_ingress_t();
+        this->curr_ingress = hart_to_encoder_ingress_t();
+        this->prev_ingress = hart_to_encoder_ingress_t();
         this->state = TRACE_ENCODER_E_IDLE;
         this->br_mode = BR_TARG;
         this->branches = 0;
+        this->resync_count = 0;
+        this->trap_reported = false;
         this->branch_map.resize(31);
         this->buffer.resize(256);
         this->buffer.clear();
@@ -90,33 +122,38 @@ class trace_encoder_e : public abstract_trace_encoder_t {
 
    private:
     void _bt_mode_data_step();
+    void _init_flags(hart_to_encoder_ingress_t *iprev, hart_to_encoder_ingress_t *icurr, hart_to_encoder_ingress_t *inext);
     void _update_branch_map(bool taken);
-    void _generate_sync_packet(subfmt_t subfmt, bool thaddr);
-    void _generate_branch_packet(bool taken);
-    uint8_t _encode_sync_packet();
-    uint8_t _encode_branch_packet();
-    uint8_t _encode_varlen(uint64_t value, uint8_t num_bytes);
+    void _generate_sync_packet(subfmt_t subfmt, hart_to_encoder_ingress_t *icurr, bool thaddr, hart_to_encoder_ingress_t *iexception);
+    void _generate_branch_packet(hart_to_encoder_ingress_t *icurr, bool taken, hart_to_encoder_ingress_t *iprev);
+    void _encode_sync_packet();
+    void _encode_branch_packet();
     uint32_t _convert_branch_map();
     void _log_packet(trace_encoder_e_packet_t* packet);
-    uint8_t load_buffer(std::vector<uint8_t> buffer, std::string data);
+    void load_buffer(std::vector<uint8_t> buffer, std::string data);
 
     std::vector<uint8_t> buffer;
     uint8_t num_bytes;
+    uint16_t num_bits_uncompressed;
     trace_encoder_e_packet_t packet;
     // trace files
     FILE* trace_sink;
     FILE* trace_log;
     FILE* debug_reference;
     // ingress packets
-    hart_to_encoder_ingress_t ingress_0;
-    hart_to_encoder_ingress_t ingress_1;
+    hart_to_encoder_ingress_t next_ingress;
+    hart_to_encoder_ingress_t curr_ingress;
+    hart_to_encoder_ingress_t prev_ingress;
     // encoder states
     bool active;
     bool enabled;
     trace_encoder_e_state_t state;
     br_mode_t br_mode;
     int branches;
+    int resync_count;
+    bool trap_reported;
     std::vector<bool> branch_map;
+    flags_t flags;
     // previous values
     uint64_t prev_timestamp;
 };

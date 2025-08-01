@@ -1,16 +1,16 @@
 #include "trace_encoder_e.h"
 
+#include <algorithm>
 #include <bitset>
 #include <iostream>
 #include <string>
-#include <algorithm>
 #include <variant>
 
 void trace_encoder_e::reset() {
     this->active = true;
     this->enabled = false;
-    this->ingress_0 = hart_to_encoder_ingress_t();
-    this->ingress_1 = hart_to_encoder_ingress_t();
+    this->curr_ingress = hart_to_encoder_ingress_t();
+    this->prev_ingress = hart_to_encoder_ingress_t();
 }
 
 void trace_encoder_e::set_enable(bool enabled) {
@@ -32,50 +32,90 @@ void trace_encoder_e::init_trace_file() {
 }
 
 void trace_encoder_e::push_ingress(hart_to_encoder_ingress_t packet) {
-    this->ingress_1 = this->ingress_0;
-    this->ingress_0 = packet;
+    this->prev_ingress = this->curr_ingress;
+    this->curr_ingress = this->next_ingress;
+    this->next_ingress = packet;
     if (this->enabled) {
         fprintf(this->debug_reference, "%lx, %d\n", packet.i_addr, packet.i_type);
         if (this->state == TRACE_ENCODER_E_IDLE) {
-            _generate_sync_packet(SUBFMT_START, 0);
+            _generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
             this->state = TRACE_ENCODER_E_DATA;
         } else if (this->state == TRACE_ENCODER_E_DATA) {
             _bt_mode_data_step();
         }
     } else if (!this->enabled) {
         if (this->state == TRACE_ENCODER_E_DATA) {
-            _generate_sync_packet(SUBFMT_START, 0);
+            _generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
             this->state = TRACE_ENCODER_E_IDLE;
         }
     }
 }
 
+void trace_encoder_e::_init_flags(hart_to_encoder_ingress_t* iprev, hart_to_encoder_ingress_t* icurr, hart_to_encoder_ingress_t* inext) {
+    this->flags.notify = false;
+
+    this->flags.prev_updiscon = (iprev->i_type == I_JUMP_UNINFERABLE) || (iprev->i_type == I_CALL_UNINFERABLE) || (iprev->i_type == I_OTHER_UNINFERABLE);
+    this->flags.curr_updiscon = (icurr->i_type == I_JUMP_UNINFERABLE) || (icurr->i_type == I_CALL_UNINFERABLE) || (icurr->i_type == I_OTHER_UNINFERABLE);
+    this->flags.updiscon = this->flags.updiscon && ((inext->i_type == I_EXCEPTION) || (inext->i_type == I_INTERRUPT) || (inext->priv != icurr->priv) /* || (this->resync_count == this->resync_max) */);
+
+    this->flags.irreport = false;
+    this->flags.irdepth = 0;
+
+    this->flags.prev_exception = (iprev->i_type == I_EXCEPTION) || (iprev->i_type == I_INTERRUPT);
+
+    this->flags.curr_exc_only = (icurr->iretire == 0) && (icurr->i_type == I_EXCEPTION) && (icurr->i_type == I_INTERRUPT);
+    this->flags.curr_exception = (icurr->i_type == I_EXCEPTION) && (icurr->i_type == I_INTERRUPT);
+
+    this->flags.next_exc_only = (inext->iretire == 0) && (inext->i_type == I_EXCEPTION) && (inext->i_type == I_INTERRUPT);
+    this->flags.next_exception = (inext->i_type == I_EXCEPTION) && (inext->i_type == I_INTERRUPT);
+
+    this->flags.prev_reported = this->flags.prev_exception && this->trap_reported;
+    this->trap_reported = false;
+
+    this->flags.ppccd = (icurr->priv != iprev->priv);
+    this->flags.ppccd_br = (icurr->priv != iprev->priv) /* || (icurr->context != iprev->context) */;
+
+    this->flags.er_n = (((icurr->iretire > 0) and this->flags.curr_exception) ||
+                        this->flags.notify);
+
+    this->flags.resync_br = (this->resync_count == RESYNC_MAX) && (this->branches != 0);
+    this->flags.rpt_br = (this->branches == MAX_BRANCHES) /* && (
+            self.pbc < MAX_BRANCHES
+        ) */
+        ;
+    this->flags.resync_exceeded = this->resync_count > RESYNC_MAX;
+}
+
 void trace_encoder_e::_bt_mode_data_step() {
-    if (this->ingress_0.i_type == I_BRANCH_NON_TAKEN || this->ingress_0.i_type == I_BRANCH_TAKEN) {
-        _update_branch_map(this->ingress_0.i_type == I_BRANCH_TAKEN);
+    if (this->curr_ingress.i_type == I_BRANCH_TAKEN || this->curr_ingress.i_type == I_BRANCH_NON_TAKEN) {
+        this->_update_branch_map(this->curr_ingress.i_type == I_BRANCH_TAKEN);
     }
-    switch (this->ingress_1.i_type) {
-        case I_BRANCH_TAKEN:
-            _generate_branch_packet(1);
-            break;
-        case I_BRANCH_NON_TAKEN:
-            _generate_branch_packet(1);
-            break;
-        case I_JUMP_INFERABLE:
-            _generate_branch_packet(0);
-            break;
-        case I_JUMP_UNINFERABLE:
-            _generate_branch_packet(1);
-            break;
-        case I_EXCEPTION:
-            _generate_sync_packet(SUBFMT_TRAP, 1);
-            break;
-        case I_INTERRUPT:
-            _generate_sync_packet(SUBFMT_TRAP, 1);
-            break;
-        case I_TRAP_RETURN:
-            _generate_sync_packet(SUBFMT_TRAP, 0);
-            break;
+
+    _init_flags(&this->prev_ingress, &this->curr_ingress, &this->next_ingress);
+
+    if (this->flags.prev_exception) {
+        if (this->flags.curr_exc_only) {
+            this->_generate_sync_packet(SUBFMT_TRAP, &this->curr_ingress, 1, &this->prev_ingress);
+        } else {
+            if (this->flags.prev_reported) {
+                this->_generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
+            } else {
+                this->_generate_sync_packet(SUBFMT_TRAP, &this->curr_ingress, 1, &this->prev_ingress);
+            }
+        }
+    } /* else if (this->flags.first_qualified || /* this->flags.pppcd ||  this->flags.resync_exceeded) {
+        this->_generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
+    } */
+    else if (this->flags.prev_updiscon) {
+        if (this->flags.curr_exc_only) {
+            this->_generate_sync_packet(SUBFMT_TRAP, &this->curr_ingress, 0, &this->curr_ingress);
+        } else {
+            this->_generate_branch_packet(&this->curr_ingress, 1, &this->prev_ingress);
+        }
+    } else if (this->flags.resync_br || this->flags.er_n) {
+        this->_generate_branch_packet(&this->curr_ingress, 1, &this->prev_ingress);
+    } else if (this->flags.next_exc_only || this->flags.ppccd_br) {
+        this->_generate_branch_packet(&this->curr_ingress, 1, &this->prev_ingress);
     }
 }
 
@@ -87,44 +127,52 @@ void trace_encoder_e::_update_branch_map(bool taken) {
     this->branch_map[this->branches - 1] = taken;
 }
 
-void trace_encoder_e::_generate_sync_packet(subfmt_t subfmt, bool thaddr) {
+void trace_encoder_e::_generate_sync_packet(subfmt_t subfmt, hart_to_encoder_ingress_t* icurr, bool thaddr, hart_to_encoder_ingress_t* iexception) {
     this->packet = sync_packet_t{};
     auto* a = std::get_if<sync_packet_t>(&this->packet);
     if (a != NULL) {
         a->fmt = FMT_3;
         a->subfmt = subfmt;
         if (subfmt == SUBFMT_START || SUBFMT_TRAP) {
-            a->branch = this->ingress_0.i_type == I_BRANCH_TAKEN ? 0 : 1;
-            a->privilege = this->ingress_0.priv;
-            a->time = this->ingress_0.i_timestamp;
+            a->branch = icurr->i_type == I_BRANCH_TAKEN ? 0 : 1;
+            a->privilege = icurr->priv;
+            a->time = icurr->i_timestamp;
             // add context here later
         }
         if (subfmt == SUBFMT_START) {
-            a->address = this->ingress_0.i_addr >> 1;
+            a->address = icurr->i_addr >> 1;
         } else if (subfmt == SUBFMT_TRAP) {
-            a->ecause = this->ingress_0.exc_cause;
-            a->interrupt = this->ingress_0.i_type == I_INTERRUPT ? 1 : 0;
+            a->ecause = iexception->exc_cause;
+            a->interrupt = iexception->i_type == I_INTERRUPT ? 1 : 0;
             a->thaddr = thaddr;
-            a->address = this->ingress_0.i_addr >> 1;
+            a->address = icurr->i_addr >> 1;
 
             if (a->interrupt == 0) {
-                a->tval = this->ingress_0.tval;
+                a->tval = iexception->tval;
             }
+
+        } else if (subfmt == SUBFMT_CONTEXT) {
+            a->privilege = icurr->priv;
+            a->time = icurr->i_timestamp;
+        } else if (subfmt == SUBFMT_SUPPORT) {
+            exit(EXIT_FAILURE);
         } else {
             exit(EXIT_FAILURE);
         }
 
-        this->num_bytes = _encode_sync_packet();
+        _encode_sync_packet();
         // write the packet to the trace sink and log it
         if (this->trace_sink && this->num_bytes > 0) {
-            fwrite(this->buffer.data(), sizeof(uint8_t), num_bytes, this->trace_sink);
+            // write the number of bytes before the packet
+            fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
+            fwrite(&this->num_bits_uncompressed, sizeof(uint16_t), 1, this->trace_sink);
+            fwrite(this->buffer.data(), sizeof(uint8_t), this->num_bytes, this->trace_sink);
             _log_packet(&this->packet);
         }
-        
     }
 }
 
-void trace_encoder_e::_generate_branch_packet(bool with_address) {
+void trace_encoder_e::_generate_branch_packet(hart_to_encoder_ingress_t* icurr, bool with_address, hart_to_encoder_ingress_t* iprev) {
     this->packet = branch_map_packet_t{};
     auto* a = std::get_if<branch_map_packet_t>(&this->packet);
     if (a != NULL) {
@@ -135,7 +183,7 @@ void trace_encoder_e::_generate_branch_packet(bool with_address) {
             a->branch_map = _convert_branch_map();
         }
         if (with_address) {
-            a->address = (this->ingress_0.i_addr - this->ingress_1.i_addr) >> 1;
+            a->address = (icurr->i_addr - iprev->i_addr) >> 1;
             if (a->branches != 0) {
                 a->fmt = FMT_1;
             } else {
@@ -151,20 +199,21 @@ void trace_encoder_e::_generate_branch_packet(bool with_address) {
             }
         }
 
-        this->num_bytes = _encode_branch_packet();
+        _encode_branch_packet();
         // write the packet to the trace sink
         if (this->trace_sink && this->num_bytes > 0) {
+            // write the number of bytes
+            fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
+            fwrite(&this->num_bits_uncompressed, sizeof(uint16_t), 1, this->trace_sink);
             fwrite(this->buffer.data(), sizeof(uint8_t), num_bytes, this->trace_sink);
             _log_packet(&this->packet);
         }
-        
     }
 }
 
-uint8_t trace_encoder_e::_encode_sync_packet() {
+void trace_encoder_e::_encode_sync_packet() {
     this->buffer.clear();
     auto* a = std::get_if<sync_packet_t>(&this->packet);
-    uint8_t num_bytes = 0;
     switch (a->subfmt) {
         case SUBFMT_START: {
             std::string packet = "";
@@ -182,7 +231,6 @@ uint8_t trace_encoder_e::_encode_sync_packet() {
             std::reverse(time.begin(), time.end());
             std::reverse(address.begin(), address.end());
 
-
             packet.append(fmt);
             packet.append(subfmt);
             packet.append(branch);
@@ -190,7 +238,7 @@ uint8_t trace_encoder_e::_encode_sync_packet() {
             packet.append(time);
             packet.append(address);
 
-            num_bytes = load_buffer(this->buffer, packet);
+            load_buffer(this->buffer, packet);
             break;
         }
         case SUBFMT_TRAP: {
@@ -214,7 +262,6 @@ uint8_t trace_encoder_e::_encode_sync_packet() {
             std::reverse(address.begin(), address.end());
             std::reverse(tval.begin(), tval.end());
 
-
             packet.append(fmt);
             packet.append(subfmt);
             packet.append(branch);
@@ -226,27 +273,23 @@ uint8_t trace_encoder_e::_encode_sync_packet() {
             packet.append(address);
             packet.append(tval);
 
-            num_bytes = load_buffer(this->buffer, packet);
+            load_buffer(this->buffer, packet);
             break;
         }
         default:
             break;
     }
-    return num_bytes;
 }
 
-uint8_t trace_encoder_e::_encode_branch_packet() {
+void trace_encoder_e::_encode_branch_packet() {
     this->buffer.clear();
     auto* a = std::get_if<branch_map_packet_t>(&this->packet);
-    uint8_t num_bytes = 0;
-
     switch (a->fmt) {
         case FMT_1: {
-
             // convert to bitstrings
             std::string packet = "";
             std::string fmt = std::bitset<2>(a->fmt).to_string();
-            std::string branches = std::bitset<2>(a->branches).to_string();
+            std::string branches = std::bitset<5>(a->branches).to_string();
             size_t branch_map_length;
             if (a->branches <= 4) {
                 branch_map_length = 3;
@@ -257,16 +300,15 @@ uint8_t trace_encoder_e::_encode_branch_packet() {
             } else if (a->branches <= 31) {
                 branch_map_length = 31;
             }
-            std::string branch_map = std::bitset<31>(a->branch_map).to_string().substr(0, branch_map_length);
+            std::string branch_map = std::bitset<31>(a->branch_map).to_string().substr(31 - branch_map_length, branch_map_length);
             std::string address = std::bitset<63>(a->address).to_string();
             std::string notify = std::to_string(a->notify);
 
-            // reverse for easier
+            // reverse for easier processing
             std::reverse(fmt.begin(), fmt.end());
             std::reverse(branches.begin(), branches.end());
             std::reverse(branch_map.begin(), branch_map.end());
             std::reverse(address.begin(), address.end());
-            
 
             packet.append(fmt);
             packet.append(branches);
@@ -274,8 +316,7 @@ uint8_t trace_encoder_e::_encode_branch_packet() {
             packet.append(address);
             packet.append(notify);
 
-
-            num_bytes = load_buffer(this->buffer, packet);
+            load_buffer(this->buffer, packet);
             break;
         }
         case FMT_2: {
@@ -283,20 +324,21 @@ uint8_t trace_encoder_e::_encode_branch_packet() {
 
             std::string fmt = std::bitset<2>(a->fmt).to_string();
             std::string address = std::bitset<63>(a->address).to_string();
+            std::string notify = std::to_string(a->notify);
 
             std::reverse(fmt.begin(), fmt.end());
             std::reverse(address.begin(), address.end());
 
             packet.append(fmt);
             packet.append(address);
+            packet.append(notify);
 
-            num_bytes = load_buffer(this->buffer, packet);
+            load_buffer(this->buffer, packet);
             break;
         }
         default:
             break;
     }
-    return num_bytes;
 }
 
 uint32_t trace_encoder_e::_convert_branch_map() {
@@ -345,8 +387,10 @@ void trace_encoder_e::_log_packet(trace_encoder_e_packet_t* packet) {
                *packet);
 }
 
-uint8_t trace_encoder_e::load_buffer(std::vector<uint8_t> buffer, std::string data) {
-    uint8_t num_bytes = 0;
+void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer, std::string data) {
+    std::cout << "packet: " << data << std::endl;
+    this->num_bytes = 0;
+    this->num_bits_uncompressed = data.size();
     // compress the packet
     int cutoff = data.size();
     for (int i = data.size() - 1; i > 0; i--) {
@@ -368,7 +412,7 @@ uint8_t trace_encoder_e::load_buffer(std::vector<uint8_t> buffer, std::string da
         data = data + padding;
     }
 
-    num_bytes = data.size() >> 3;
+    this->num_bytes = data.size() >> 3;
 
     // write to buffer
     for (int i = 0; i < num_bytes; i++) {
@@ -377,7 +421,4 @@ uint8_t trace_encoder_e::load_buffer(std::vector<uint8_t> buffer, std::string da
         uint8_t byte = std::stoi(byte_string, nullptr, 2);
         this->buffer.push_back(byte);
     }
-
-
-    return num_bytes;
 }
