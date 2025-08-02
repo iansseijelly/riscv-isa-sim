@@ -56,9 +56,7 @@ struct branch_map_packet_t {
     uint32_t branch_map : 31;
     uint64_t address;
     bool notify;
-    // bool updiscon;
-    // bool irreport;
-    // uint64_t irdepth;
+    bool updiscon;
 };
 
 struct flags_t {
@@ -91,9 +89,9 @@ enum trace_encoder_e_state_t {
 
 using trace_encoder_e_packet_t = std::variant<sync_packet_t, branch_map_packet_t>;
 
-#define MAX_TRACE_BUFFER_SIZE 256
+#define MAX_TRACE_BUFFER_SIZE 256 // arbitrary
 #define MAX_COMPRESS_DELTA 6
-#define RESYNC_MAX 32
+#define RESYNC_MAX 32 // arbitrary
 #define MAX_BRANCHES 31
 
 class trace_encoder_e : public abstract_trace_encoder_t {
