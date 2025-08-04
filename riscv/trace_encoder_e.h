@@ -123,7 +123,7 @@ class trace_encoder_e : public abstract_trace_encoder_t {
     void _init_flags(hart_to_encoder_ingress_t *iprev, hart_to_encoder_ingress_t *icurr, hart_to_encoder_ingress_t *inext);
     void _update_branch_map(bool taken);
     void _generate_sync_packet(subfmt_t subfmt, hart_to_encoder_ingress_t *icurr, bool thaddr, hart_to_encoder_ingress_t *iexception);
-    void _generate_branch_packet(hart_to_encoder_ingress_t *icurr, bool taken, hart_to_encoder_ingress_t *iprev);
+    void _generate_branch_packet(hart_to_encoder_ingress_t *icurr, bool with_address, hart_to_encoder_ingress_t *iprev);
     void _encode_sync_packet();
     void _encode_branch_packet();
     uint32_t _convert_branch_map();

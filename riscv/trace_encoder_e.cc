@@ -1,4 +1,5 @@
 #include "trace_encoder_e.h"
+#include "trace_ingress.h"
 
 #include <algorithm>
 #include <bitset>
@@ -32,7 +33,7 @@ void trace_encoder_e::push_ingress(hart_to_encoder_ingress_t packet) {
   this->curr_ingress = this->next_ingress;
   this->next_ingress = packet;
   if (this->enabled) {
-    fprintf(this->debug_reference, "%lx, %d\n", packet.i_addr, packet.i_type);
+    fprintf(this->debug_reference, "%lx, %d\n", curr_ingress.i_addr, curr_ingress.i_type);
     if (this->state == TRACE_ENCODER_E_IDLE) {
       _generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
       this->state = TRACE_ENCODER_E_DATA;
@@ -211,7 +212,10 @@ void trace_encoder_e::_generate_branch_packet(
       a->branch_map = _convert_branch_map();
     }
     if (with_address) {
-      a->address = (icurr->i_addr - iprev->i_addr) >> 1;
+      // a->address = (icurr->i_addr - iprev->i_addr) >> 1;
+      // std::cout << "source: " << std::hex << (iprev->i_addr) << std::endl;
+      // std::cout << "diff: " << std::hex << (icurr->i_addr - iprev->i_addr) << std::endl;
+      // std::cout << "compressed: " << std::hex << ((icurr->i_addr - iprev->i_addr) >> 1) << std::endl << std::endl;
       if (a->branches != 0) {
         a->fmt = FMT_1;
       } else {
@@ -228,6 +232,7 @@ void trace_encoder_e::_generate_branch_packet(
       if (a->branches == 31) {
         a->branches = 0;
       }
+      a->address = 0;
     }
 
     _encode_branch_packet();
@@ -324,7 +329,7 @@ void trace_encoder_e::_encode_branch_packet() {
     std::string fmt = std::bitset<2>(a->fmt).to_string();
     std::string branches = std::bitset<5>(a->branches).to_string();
     size_t branch_map_length;
-    if (a->branches <= 4) {
+    if (a->branches <= 3) {
       branch_map_length = 3;
     } else if (a->branches <= 7) {
       branch_map_length = 7;
@@ -338,7 +343,9 @@ void trace_encoder_e::_encode_branch_packet() {
             .to_string()
             .substr(31 - branch_map_length, branch_map_length);
     std::string address = std::bitset<63>(a->address).to_string();
+    std::cout << "address string: " << std::hex << address << std::endl;
     std::string notify = std::to_string(a->notify);
+    std::string updiscon = std::to_string(a->updiscon);
 
     // reverse for easier processing
     std::reverse(fmt.begin(), fmt.end());
@@ -351,6 +358,7 @@ void trace_encoder_e::_encode_branch_packet() {
     packet.append(branch_map);
     packet.append(address);
     packet.append(notify);
+    packet.append(updiscon);
 
     load_buffer(this->buffer, packet);
     break;
@@ -361,6 +369,7 @@ void trace_encoder_e::_encode_branch_packet() {
     std::string fmt = std::bitset<2>(a->fmt).to_string();
     std::string address = std::bitset<63>(a->address).to_string();
     std::string notify = std::to_string(a->notify);
+    std::string updiscon = std::to_string(a->updiscon);
 
     std::reverse(fmt.begin(), fmt.end());
     std::reverse(address.begin(), address.end());
@@ -368,6 +377,7 @@ void trace_encoder_e::_encode_branch_packet() {
     packet.append(fmt);
     packet.append(address);
     packet.append(notify);
+    packet.append(updiscon);
 
     load_buffer(this->buffer, packet);
     break;
@@ -432,7 +442,6 @@ void trace_encoder_e::_log_packet(trace_encoder_e_packet_t *packet) {
 
 void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
                                   std::string data) {
-  std::cout << "packet: " << data << std::endl;
   this->num_bytes = 0;
   this->num_bits_uncompressed = data.size();
   // compress the packet
