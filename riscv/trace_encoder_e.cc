@@ -338,7 +338,7 @@ void trace_encoder_e::_encode_branch_packet() {
         std::bitset<31>(a->branch_map)
             .to_string()
             .substr(31 - branch_map_length, branch_map_length);
-    std::string address = std::bitset<63>(a->address).to_string();
+    std::string address = (a->branches != 0) ? std::bitset<63>(a->address).to_string() : "";
     std::string notify = std::to_string(a->notify);
     std::string updiscon = std::to_string(a->updiscon);
 
@@ -449,8 +449,6 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
   }
   data = data.substr(0, cutoff);
 
-  std::cout << "\nsize: " << data.size() << ", stripped packet: " << data << std::endl;
-
   // sign extend to byte boundary
   int remainder = data.size() % 8;
   if (remainder != 0) {
@@ -462,7 +460,6 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
     data = data + padding;
   }
 
-  std::cout << "size: " << data.size() << ", compressed packet: " << data << std::endl;
   this->num_bytes = data.size() >> 3;
 
   // write to buffer
