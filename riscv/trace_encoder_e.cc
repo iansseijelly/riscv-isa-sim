@@ -33,7 +33,8 @@ void trace_encoder_e::push_ingress(hart_to_encoder_ingress_t packet) {
   this->curr_ingress = this->next_ingress;
   this->next_ingress = packet;
   if (this->enabled) {
-    fprintf(this->debug_reference, "%lx, %d\n", curr_ingress.i_addr, curr_ingress.i_type);
+    fprintf(this->debug_reference, "%lx, %d\n", curr_ingress.i_addr,
+            curr_ingress.i_type);
     if (this->state == TRACE_ENCODER_E_IDLE) {
       _generate_sync_packet(SUBFMT_START, &this->curr_ingress, 0, NULL);
       this->state = TRACE_ENCODER_E_DATA;
@@ -122,11 +123,7 @@ void trace_encoder_e::_bt_mode_data_step() {
                                     &this->prev_ingress);
       }
     }
-  } /* else if (this->flags.first_qualified || /* this->flags.pppcd ||
-  this->flags.resync_exceeded) { this->_generate_sync_packet(SUBFMT_START,
-  &this->curr_ingress, 0, NULL);
-  } */
-  else if (this->flags.prev_updiscon) {
+  } else if (this->flags.prev_updiscon) {
     if (this->flags.curr_exc_only) {
       this->_generate_sync_packet(SUBFMT_TRAP, &this->curr_ingress, 0,
                                   &this->curr_ingress);
@@ -138,13 +135,12 @@ void trace_encoder_e::_bt_mode_data_step() {
     this->_generate_branch_packet(&this->curr_ingress, 1, &this->prev_ingress);
   } else if (this->flags.next_exc_only || this->flags.ppccd_br) {
     this->_generate_branch_packet(&this->curr_ingress, 1, &this->prev_ingress);
+  } else if (this->flags.rpt_br) {
+    this->_generate_branch_packet(&this->curr_ingress, 0, &this->prev_ingress);
   }
 }
 
 void trace_encoder_e::_update_branch_map(bool taken) {
-  if (this->branches == 31) {
-    this->branches = 0;
-  }
   this->branches += 1;
   this->branch_map[this->branches - 1] = taken;
 }
@@ -211,11 +207,9 @@ void trace_encoder_e::_generate_branch_packet(
     } else {
       a->branch_map = _convert_branch_map();
     }
+
     if (with_address) {
-      // a->address = (icurr->i_addr - iprev->i_addr) >> 1;
-      // std::cout << "source: " << std::hex << (iprev->i_addr) << std::endl;
-      // std::cout << "diff: " << std::hex << (icurr->i_addr - iprev->i_addr) << std::endl;
-      // std::cout << "compressed: " << std::hex << ((icurr->i_addr - iprev->i_addr) >> 1) << std::endl << std::endl;
+      a->address = (icurr->i_addr - iprev->i_addr) >> 1;
       if (a->branches != 0) {
         a->fmt = FMT_1;
       } else {
@@ -223,7 +217,7 @@ void trace_encoder_e::_generate_branch_packet(
         a->branches = 0;
         a->branch_map = 0;
       }
-      
+
       a->notify = this->flags.notify;
       a->updiscon = this->flags.updiscon ^ this->flags.notify;
 
@@ -231,6 +225,7 @@ void trace_encoder_e::_generate_branch_packet(
       a->fmt = FMT_1;
       if (a->branches == 31) {
         a->branches = 0;
+        this->branches = 0;
       }
       a->address = 0;
     }
@@ -247,7 +242,6 @@ void trace_encoder_e::_generate_branch_packet(
     }
   }
 }
-
 
 void trace_encoder_e::_encode_sync_packet() {
   this->buffer.clear();
@@ -329,13 +323,15 @@ void trace_encoder_e::_encode_branch_packet() {
     std::string fmt = std::bitset<2>(a->fmt).to_string();
     std::string branches = std::bitset<5>(a->branches).to_string();
     size_t branch_map_length;
-    if (a->branches <= 3) {
+    if (a->branches == 0) {
+      branch_map_length = 31;
+    } else if (a->branches <= 3) {
       branch_map_length = 3;
     } else if (a->branches <= 7) {
       branch_map_length = 7;
     } else if (a->branches <= 15) {
       branch_map_length = 15;
-    } else if (a->branches <= 31) {
+    } else if (a->branches < 31) {
       branch_map_length = 31;
     }
     std::string branch_map =
@@ -343,7 +339,6 @@ void trace_encoder_e::_encode_branch_packet() {
             .to_string()
             .substr(31 - branch_map_length, branch_map_length);
     std::string address = std::bitset<63>(a->address).to_string();
-    std::cout << "address string: " << std::hex << address << std::endl;
     std::string notify = std::to_string(a->notify);
     std::string updiscon = std::to_string(a->updiscon);
 
@@ -419,7 +414,7 @@ void trace_encoder_e::_log_packet(trace_encoder_e_packet_t *packet) {
           case FMT_1: {
             fprintf(this->trace_log,
                     "[Packet]: fmt: %d, branches: %d, branch_map: %d, address: "
-                    "%x, notify: %d\n",
+                    "0x%x, notify: %d\n",
                     pkt.fmt, pkt.branches, pkt.branch_map, pkt.address << 1,
                     pkt.notify);
             break;
@@ -454,17 +449,20 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
   }
   data = data.substr(0, cutoff);
 
+  std::cout << "\nsize: " << data.size() << ", stripped packet: " << data << std::endl;
+
   // sign extend to byte boundary
   int remainder = data.size() % 8;
   if (remainder != 0) {
     char msb = data[data.size() - 1];
     std::string padding = "";
-    for (int i = 0; i < remainder; i++) {
+    for (int i = 0; i < 8 - remainder; i++) {
       padding += msb;
     }
     data = data + padding;
   }
 
+  std::cout << "size: " << data.size() << ", compressed packet: " << data << std::endl;
   this->num_bytes = data.size() >> 3;
 
   // write to buffer
