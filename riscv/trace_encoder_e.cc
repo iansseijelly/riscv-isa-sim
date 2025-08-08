@@ -104,9 +104,10 @@ void trace_encoder_e::_init_flags(hart_to_encoder_ingress_t *iprev,
 }
 
 void trace_encoder_e::_bt_mode_data_step() {
-  if (this->curr_ingress.i_type == I_BRANCH_TAKEN ||
-      this->curr_ingress.i_type == I_BRANCH_NON_TAKEN) {
-    this->_update_branch_map(this->curr_ingress.i_type == I_BRANCH_TAKEN);
+  if (this->prev_ingress.i_type == I_BRANCH_TAKEN ||
+      this->prev_ingress.i_type == I_BRANCH_NON_TAKEN) {
+    this->_update_branch_map(this->prev_ingress.i_type == I_BRANCH_TAKEN);
+    std::cout << "\ttaken branch at pc = " << std::hex << this->prev_ingress.i_addr << std::endl;
   }
 
   _init_flags(&this->prev_ingress, &this->curr_ingress, &this->next_ingress);
@@ -181,6 +182,8 @@ void trace_encoder_e::_generate_sync_packet(
       exit(EXIT_FAILURE);
     }
 
+    this->branches = 0; // reset branches
+
     _encode_sync_packet();
     // write the packet to the trace sink and log it
     if (this->trace_sink && this->num_bytes > 0) {
@@ -202,33 +205,33 @@ void trace_encoder_e::_generate_branch_packet(
   auto *a = std::get_if<branch_map_packet_t>(&this->packet);
   if (a != NULL) {
     a->branches = this->branches;
+    
     if (this->branch_map.size() == 0) {
       a->branch_map = 0;
     } else {
       a->branch_map = _convert_branch_map();
     }
 
-    if (with_address) {
+    if (!with_address) {
+      a->fmt = FMT_1;
+      a->address = 0;
+    } else {
+      std::cout << "previous address: " << std::hex << iprev->i_addr << ", current address: " << icurr->i_addr << std::endl;
       a->address = (icurr->i_addr - iprev->i_addr) >> 1;
       if (a->branches != 0) {
         a->fmt = FMT_1;
       } else {
         a->fmt = FMT_2;
-        a->branches = 0;
-        a->branch_map = 0;
       }
-
       a->notify = this->flags.notify;
       a->updiscon = this->flags.updiscon ^ this->flags.notify;
-
-    } else {
-      a->fmt = FMT_1;
-      if (a->branches == 31) {
-        a->branches = 0;
-        this->branches = 0;
-      }
-      a->address = 0;
     }
+
+    if (a->branches == 31) {
+      a->branches = 0;
+    }
+
+    this->branches = 0; // reset branches
 
     _encode_branch_packet();
     // write the packet to the trace sink
@@ -338,7 +341,8 @@ void trace_encoder_e::_encode_branch_packet() {
         std::bitset<31>(a->branch_map)
             .to_string()
             .substr(31 - branch_map_length, branch_map_length);
-    std::string address = (a->branches != 0) ? std::bitset<63>(a->address).to_string() : "";
+    std::string address =
+        (a->branches != 0) ? std::bitset<63>(a->address).to_string() : ""; // TODO - more sound logic for addresses. there can be no-address packets when branches !- 0
     std::string notify = std::to_string(a->notify);
     std::string updiscon = std::to_string(a->updiscon);
 
@@ -384,8 +388,9 @@ void trace_encoder_e::_encode_branch_packet() {
 
 uint32_t trace_encoder_e::_convert_branch_map() {
   uint32_t result = 0;
-  for (size_t i = 0; i < this->branches; ++i) {
-    if (branch_map[this->branches - 1 - i]) {
+  size_t size = this->branches;
+  for (size_t i = 0; i < size; ++i) {
+    if (branch_map[size - 1 - i]) {
       result |= (1 << i);
     }
   }
