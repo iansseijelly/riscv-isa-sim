@@ -333,6 +333,7 @@ int main(int argc, char** argv)
   bool log_cache = false;
   bool log_commits = false;
   bool trace = false;
+  std::string trace_encoder_type = "l";
   const char *log_path = nullptr;
   std::vector<std::function<extension_t*()>> extensions;
   const char* initrd = NULL;
@@ -435,8 +436,12 @@ int main(int argc, char** argv)
       [&](const char UNUSED *s){dm_config.support_haltgroups = false;});
   parser.option(0, "log-commits", 0,
                 [&](const char UNUSED *s){log_commits = true;});
-  parser.option(0, "trace", 0,
-                [&](const char UNUSED *s){trace = true;});
+  parser.option(0, "trace", 1,
+  [&](const char* s){
+    trace = true;
+    if (s && *s) trace_encoder_type = s;
+    else trace_encoder_type = "l";
+  });
   parser.option(0, "log", 1,
                 [&](const char* s){log_path = s;});
   FILE *cmd_file = NULL;
@@ -522,7 +527,8 @@ int main(int argc, char** argv)
       mems, plugin_device_factories, htif_args, dm_config, log_path, dtb_enabled, dtb_file,
       socket,
       cmd_file,
-      instructions);
+      instructions,
+      trace_encoder_type);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));

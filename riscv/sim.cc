@@ -45,7 +45,8 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
              bool dtb_enabled, const char *dtb_file,
              bool socket_enabled,
              FILE *cmd_file, // needed for command line option --cmd
-             std::optional<unsigned long long> instruction_limit)
+             std::optional<unsigned long long> instruction_limit,
+             const std::string& trace_encoder_type)
   : htif_t(args),
     cfg(cfg),
     mems(mems),
@@ -60,7 +61,8 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
     histogram_enabled(false),
     log(false),
     remote_bitbang(NULL),
-    debug_module(this, dm_config)
+    debug_module(this, dm_config),
+    trace_encoder_type(trace_encoder_type)
 {
   signal(SIGINT, &handle_signal);
 
@@ -103,7 +105,7 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
     for (size_t i = 0; i < cfg->nprocs(); i++) {
       procs.push_back(new processor_t(cfg->isa, cfg->priv,
                                       cfg, this, cfg->hartids[i], halted,
-                                      log_file.get(), sout_));
+                                      log_file.get(), sout_, trace_encoder_type));
       harts[cfg->hartids[i]] = procs[i];
     }
     return;
@@ -198,7 +200,7 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
 
     procs.push_back(new processor_t(isa_str, cfg->priv,
                                     cfg, this, hartid, halted,
-                                    log_file.get(), sout_));
+                                    log_file.get(), sout_, trace_encoder_type));
     harts[hartid] = procs[cpu_idx];
 
     // handle pmp
