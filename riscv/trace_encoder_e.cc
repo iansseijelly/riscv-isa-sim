@@ -107,7 +107,6 @@ void trace_encoder_e::_bt_mode_data_step() {
   if (this->prev_ingress.i_type == I_BRANCH_TAKEN ||
       this->prev_ingress.i_type == I_BRANCH_NON_TAKEN) {
     this->_update_branch_map(this->prev_ingress.i_type == I_BRANCH_TAKEN);
-    std::cout << "\ttaken branch at pc = " << std::hex << this->prev_ingress.i_addr << std::endl;
   }
 
   _init_flags(&this->prev_ingress, &this->curr_ingress, &this->next_ingress);
@@ -216,7 +215,6 @@ void trace_encoder_e::_generate_branch_packet(
       a->fmt = FMT_1;
       a->address = 0;
     } else {
-      std::cout << "previous address: " << std::hex << iprev->i_addr << ", current address: " << icurr->i_addr << std::endl;
       a->address = (icurr->i_addr - iprev->i_addr) >> 1;
       if (a->branches != 0) {
         a->fmt = FMT_1;

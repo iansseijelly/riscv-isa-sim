@@ -248,7 +248,8 @@ public:
   processor_t(const char* isa_str, const char* priv_str,
               const cfg_t* cfg,
               simif_t* sim, uint32_t id, bool halt_on_reset,
-              FILE *log_file, std::ostream& sout_); // because of command line option --log and -s we need both
+              FILE *log_file, std::ostream& sout_,
+              const std::string& trace_encoder_type = "l");
   ~processor_t();
 
   const isa_parser_t &get_isa() { return isa; }
@@ -373,7 +374,7 @@ public:
 
   void check_if_lpad_required();
 
-  abstract_trace_encoder_t* get_trace_encoder() { return &trace_encoder; }
+  abstract_trace_encoder_t* get_trace_encoder() { return trace_encoder; }
 
 private:
   const isa_parser_t isa;
@@ -441,8 +442,10 @@ public:
 
   vectorUnit_t VU;
   triggers::module_t TM;
-  trace_encoder_e trace_encoder;
+  abstract_trace_encoder_t* trace_encoder;
   size_t total_insn_count;
+  std::string trace_encoder_type;
+  void create_trace_encoder();
 };
 
 #endif

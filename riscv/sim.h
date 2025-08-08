@@ -36,7 +36,8 @@ public:
         bool dtb_enabled, const char *dtb_file,
         bool socket_enabled,
         FILE *cmd_file, // needed for command line option --cmd
-        std::optional<unsigned long long> instruction_limit);
+        std::optional<unsigned long long> instruction_limit,
+        const std::string& trace_encoder_type = "l");
   ~sim_t();
 
   int run();
@@ -86,6 +87,7 @@ private:
   FILE *cmd_file; // pointer to debug command input file
 
   std::optional<unsigned long long> instruction_limit;
+  std::string trace_encoder_type;
 
   socketif_t *socketif;
   std::ostream sout_; // used for socket and terminal interface

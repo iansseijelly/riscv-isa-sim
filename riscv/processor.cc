@@ -23,6 +23,9 @@
 #include <stdexcept>
 #include <string>
 #include <algorithm>
+#include "trace_encoder_l.h"
+#include "trace_encoder_n.h"
+#include "trace_encoder_e.h"
 
 #ifdef __GNUC__
 # pragma GCC diagnostic ignored "-Wunused-variable"
@@ -34,13 +37,15 @@
 processor_t::processor_t(const char* isa_str, const char* priv_str,
                          const cfg_t *cfg,
                          simif_t* sim, uint32_t id, bool halt_on_reset,
-                         FILE* log_file, std::ostream& sout_)
+                         FILE* log_file, std::ostream& sout_,
+                         const std::string& trace_encoder_type)
 : debug(false), halt_request(HR_NONE), isa(isa_str, priv_str), cfg(cfg), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false),
   log_file(log_file), sout_(sout_.rdbuf()), halt_on_reset(halt_on_reset),
   in_wfi(false), check_triggers_icount(false),
   impl_table(256, false), extension_enable_table(isa.get_extension_table()),
-  last_pc(1), executions(1), TM(cfg->trigger_count), total_insn_count(0)
+  last_pc(1), executions(1), TM(cfg->trigger_count), total_insn_count(0),
+  trace_encoder_type(trace_encoder_type), trace_encoder(nullptr)
 {
   VU.p = this;
   TM.proc = this;
@@ -80,6 +85,8 @@ processor_t::processor_t(const char* isa_str, const char* priv_str,
   set_impl(IMPL_MMU_ASID, true);
   set_impl(IMPL_MMU_VMID, true);
 
+  create_trace_encoder();
+  assert(trace_encoder != nullptr);
   reset();
 }
 
@@ -98,6 +105,21 @@ processor_t::~processor_t()
 
   delete mmu;
   delete disassembler;
+  delete trace_encoder;
+}
+
+void processor_t::create_trace_encoder() {
+    if (trace_encoder) delete trace_encoder;
+    if (trace_encoder_type == "l") {
+        trace_encoder = new trace_encoder_l();
+    } else if (trace_encoder_type == "e") {
+        trace_encoder = new trace_encoder_e();
+    } else {
+        fprintf(stderr, "Unknown trace encoder type: %s\\n", trace_encoder_type.c_str());
+        abort();
+    }
+    fprintf(stderr, "Created trace_encoder of type: %s at %p\\n", trace_encoder_type.c_str(), (void*)trace_encoder);
+    assert(trace_encoder != nullptr);
 }
 
 static void bad_option_string(const char *option, const char *value,
@@ -188,7 +210,7 @@ void processor_t::enable_trace()
   trace_enabled = true;
 
   // if trace flag is true, touch the file, otherwise leave it -- don't do in encoder ∵ encoder enable/disable toggles mid process
-  trace_encoder.init_trace_file();
+  trace_encoder->init_trace_file();
 }
 
 void processor_t::reset()
@@ -215,7 +237,7 @@ void processor_t::reset()
   if (sim)
     sim->proc_reset(id);
 
-  trace_encoder.reset();
+  trace_encoder->reset();
 }
 
 extension_t* processor_t::get_extension()
@@ -561,7 +583,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
         .ilastsize = insn_length(t.get_tinst())/2,
         .i_timestamp = state.mcycle->read(),
       };
-      trace_encoder.push_ingress(packet);
+      trace_encoder->push_ingress(packet);
     }
   }
 }
