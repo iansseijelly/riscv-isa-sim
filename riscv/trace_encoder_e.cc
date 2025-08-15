@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cstdint>
+#include <ios>
 #include <iostream>
 #include <string>
 #include <variant>
@@ -188,7 +190,7 @@ void trace_encoder_e::_generate_sync_packet(
     if (this->trace_sink && this->num_bytes > 0) {
       // write the number of bytes before the packet
       fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
-      fwrite(&this->num_bits_uncompressed, sizeof(uint16_t), 1,
+      fwrite(&this->bits_uncompressed_diff, sizeof(uint8_t), 1,
              this->trace_sink);
       fwrite(this->buffer.data(), sizeof(uint8_t), this->num_bytes,
              this->trace_sink);
@@ -221,8 +223,7 @@ void trace_encoder_e::_generate_branch_packet(
       } else {
         a->fmt = FMT_2;
       }
-      a->notify = this->flags.notify;
-      a->updiscon = this->flags.updiscon ^ this->flags.notify;
+      set_status_fields(a, get_msb(icurr->i_addr - iprev->i_addr));
     }
 
     if (a->branches == 31) {
@@ -231,12 +232,13 @@ void trace_encoder_e::_generate_branch_packet(
 
     this->branches = 0; // reset branches
 
+    
     _encode_branch_packet();
     // write the packet to the trace sink
     if (this->trace_sink && this->num_bytes > 0) {
       // write the number of bytes
       fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
-      fwrite(&this->num_bits_uncompressed, sizeof(uint16_t), 1,
+      fwrite(&this->bits_uncompressed_diff, sizeof(uint8_t), 1,
              this->trace_sink);
       fwrite(this->buffer.data(), sizeof(uint8_t), num_bytes, this->trace_sink);
       _log_packet(&this->packet);
@@ -341,8 +343,8 @@ void trace_encoder_e::_encode_branch_packet() {
             .substr(31 - branch_map_length, branch_map_length);
     std::string address =
         (a->branches != 0) ? std::bitset<63>(a->address).to_string() : ""; // TODO - more sound logic for addresses. there can be no-address packets when branches !- 0
-    std::string notify = std::to_string(a->notify);
-    std::string updiscon = std::to_string(a->updiscon);
+    std::string notify = (address != "") ? std::to_string(a->notify) : "";
+    std::string updiscon = (address != "") ? std::to_string(a->updiscon): "";
 
     // reverse for easier processing
     std::reverse(fmt.begin(), fmt.end());
@@ -417,16 +419,16 @@ void trace_encoder_e::_log_packet(trace_encoder_e_packet_t *packet) {
           case FMT_1: {
             fprintf(this->trace_log,
                     "[Packet]: fmt: %d, branches: %d, branch_map: %d, address: "
-                    "0x%x, notify: %d\n",
+                    "0x%x, notify: %d, updiscon: %d\n",
                     pkt.fmt, pkt.branches, pkt.branch_map, pkt.address << 1,
-                    pkt.notify);
+                    pkt.notify, pkt.updiscon);
             break;
           }
 
           case FMT_2: {
             fprintf(this->trace_log,
-                    "[Packet]: fmt: %d, address: %x, notify: %d\n", pkt.fmt,
-                    pkt.address << 1, pkt.notify);
+                    "[Packet]: fmt: %d, address: %x, notify: %d, updiscon: %d\n", pkt.fmt,
+                    pkt.address << 1, pkt.notify, pkt.updiscon);
             break;
           }
 
@@ -441,7 +443,7 @@ void trace_encoder_e::_log_packet(trace_encoder_e_packet_t *packet) {
 void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
                                   std::string data) {
   this->num_bytes = 0;
-  this->num_bits_uncompressed = data.size();
+  uint16_t bits_uncompressed = data.size();
   // compress the packet
   int cutoff = data.size();
   for (int i = data.size() - 1; i > 0; i--) {
@@ -464,6 +466,7 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
   }
 
   this->num_bytes = data.size() >> 3;
+  this->bits_uncompressed_diff = (bits_uncompressed > this->num_bytes << 3) ? (uint8_t) (bits_uncompressed - (this->num_bytes << 3)) : 0;
 
   // write to buffer
   for (int i = 0; i < num_bytes; i++) {
@@ -472,4 +475,15 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
     uint8_t byte = std::stoi(byte_string, nullptr, 2);
     this->buffer.push_back(byte);
   }
+}
+
+void trace_encoder_e::set_status_fields(branch_map_packet_t *packet, bool msb) {
+  packet->notify = this->flags.notify ^ msb;
+  packet->updiscon = this->flags.updiscon ^ packet->notify;
+}
+
+bool trace_encoder_e::get_msb(uint64_t differential_address) {
+//   std::cout << "differential address: " << std::bitset<64>(differential_address) << std::endl;
+//   std::cout << "msb: " << ((differential_address >> 63) & 0b1) << std::endl;
+  return (differential_address >> 63) & 0b1;
 }

@@ -1,6 +1,7 @@
 #ifndef _RISCV_TRACE_ENCODER_E_H
 #define _RISCV_TRACE_ENCODER_E_H
 
+#include <cstdint>
 #include <stdio.h>
 
 #include <cassert>
@@ -129,10 +130,12 @@ class trace_encoder_e : public abstract_trace_encoder_t {
     uint32_t _convert_branch_map();
     void _log_packet(trace_encoder_e_packet_t* packet);
     void load_buffer(std::vector<uint8_t> buffer, std::string data);
+    void set_status_fields(branch_map_packet_t *packet, bool msb);
+    bool get_msb(uint64_t value);
 
     std::vector<uint8_t> buffer;
     uint8_t num_bytes;
-    uint16_t num_bits_uncompressed;
+    uint8_t bits_uncompressed_diff;
     trace_encoder_e_packet_t packet;
     // trace files
     FILE* trace_sink;
