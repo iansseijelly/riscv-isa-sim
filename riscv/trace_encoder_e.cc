@@ -190,8 +190,6 @@ void trace_encoder_e::_generate_sync_packet(
     if (this->trace_sink && this->num_bytes > 0) {
       // write the number of bytes before the packet
       fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
-      fwrite(&this->bits_uncompressed_diff, sizeof(uint8_t), 1,
-             this->trace_sink);
       fwrite(this->buffer.data(), sizeof(uint8_t), this->num_bytes,
              this->trace_sink);
       _log_packet(&this->packet);
@@ -238,8 +236,6 @@ void trace_encoder_e::_generate_branch_packet(
     if (this->trace_sink && this->num_bytes > 0) {
       // write the number of bytes
       fwrite(&this->num_bytes, sizeof(uint8_t), 1, this->trace_sink);
-      fwrite(&this->bits_uncompressed_diff, sizeof(uint8_t), 1,
-             this->trace_sink);
       fwrite(this->buffer.data(), sizeof(uint8_t), num_bytes, this->trace_sink);
       _log_packet(&this->packet);
     }
@@ -465,6 +461,7 @@ void trace_encoder_e::load_buffer(std::vector<uint8_t> buffer,
     data = data + padding;
   }
 
+  
   this->num_bytes = data.size() >> 3;
   this->bits_uncompressed_diff = (bits_uncompressed > this->num_bytes << 3) ? (uint8_t) (bits_uncompressed - (this->num_bytes << 3)) : 0;
 
