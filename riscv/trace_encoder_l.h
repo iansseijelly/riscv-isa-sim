@@ -39,16 +39,28 @@ enum trap_type_t {
   T_TRAP_RETURN = 0b100,
 };
 
+enum sync_type_t {
+	S_START     = 0b000,
+	S_PERIODIC  = 0b001,
+	S_ENTER_CTX = 0b010,
+	S_EXIT_CTX  = 0b011,
+	S_END       = 0b111,
+};
+
 struct trace_encoder_l_packet_t {
   c_header_t c_header;
   f_header_t f_header;
   trap_type_t trap_type;
-  uint64_t address;
+  sync_type_t sync_type;
+  uint64_t target_address;
+  uint64_t from_address;
   uint64_t timestamp;
+  uint32_t ctx;
 };
 
 enum trace_encoder_l_state_t {
   TRACE_ENCODER_L_IDLE,
+  TRACE_ENCODER_L_ARMED,
   TRACE_ENCODER_L_DATA,
 };
 
@@ -61,6 +73,10 @@ int find_msb(uint64_t x);
 int ceil_div(int a, int b);
 int encode_varlen(uint64_t value, uint8_t* buffer);
 c_header_t get_c_header(f_header_t f_header);
+int _encode_varlen(uint64_t value, uint8_t* buffer);
+int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
+int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer, int func);
+int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
 
 class trace_encoder_l : public abstract_trace_encoder_t {
 public:
@@ -79,18 +95,19 @@ public:
   bool get_enable() override;
   void set_br_mode(br_mode_t br_mode) override;
   br_mode_t get_br_mode();
-  
+  void set_ctx_mode(ctx_mode_t ctx_mode) override;
+  ctx_mode_t get_ctx_mode();
+  void set_ctx_id(uint32_t ctx_id);
+  uint32_t get_ctx_id();
   void push_ingress(hart_to_encoder_ingress_t packet) override;
   
 private:
-  void _generate_sync_packet();
+  void _generate_sync_packet(sync_type_t sync_type);
   void _generate_direct_packet(f_header_t f_header);
   void _generate_jump_uninferable_packet();
   void _generate_trap_packet(trap_type_t trap_type);
   void _generate_hit_packet();
-  int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
-  int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);
-  int _encode_varlen(uint64_t value, uint8_t* buffer);
+
   void _log_packet(trace_encoder_l_packet_t* packet);
   void _log_prediction(bool prediction, bool hit);
   void _bt_mode_data_step();
@@ -108,6 +125,8 @@ private:
   bool active;
   bool enabled;
   br_mode_t br_mode;
+  ctx_mode_t ctx_mode;
+  uint32_t ctx_id;
   trace_encoder_l_state_t state;
   // previous values
   uint64_t prev_timestamp;

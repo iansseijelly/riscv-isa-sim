@@ -24,6 +24,14 @@ void trace_encoder_e::set_br_mode(br_mode_t br_mode) {
   this->br_mode = br_mode;
 }
 
+void trace_encoder_e::set_ctx_mode(ctx_mode_t ctx_mode) {
+  // ignore
+}
+
+void trace_encoder_e::set_ctx_id(uint32_t ctx_id) {
+  // ignore
+}
+
 void trace_encoder_e::init_trace_file() {
   this->trace_sink = fopen("etrace.out", "wb");
   this->trace_log = fopen("etrace.log", "wb");

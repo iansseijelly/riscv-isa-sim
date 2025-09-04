@@ -116,6 +116,8 @@ class trace_encoder_e : public abstract_trace_encoder_t {
     void set_enable(bool enabled) override;
     bool get_enable() override;
     void set_br_mode(br_mode_t br_mode) override;
+    void set_ctx_mode(ctx_mode_t ctx_mode) override;
+    void set_ctx_id(uint32_t ctx_id);
     void init_trace_file() override;
     void push_ingress(hart_to_encoder_ingress_t packet) override;
 

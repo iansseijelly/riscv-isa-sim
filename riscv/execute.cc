@@ -1,6 +1,7 @@
 // See LICENSE for license details.
 
 #include "config.h"
+#include "csrs.h"
 #include "processor.h"
 #include "trace_ingress.h"
 #include "trace_encoder_e.h"
@@ -176,7 +177,6 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
 
   try {
     npc = fetch.func(p, fetch.insn, pc);
-
     if (npc != PC_SERIALIZE_BEFORE) {
       if (p->get_trace_enabled()) {
         hart_to_encoder_ingress_t packet {
@@ -185,6 +185,7 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
         .tval = 0,
         .priv = static_cast<priv_enc>(p->get_state()->prv),
         .i_addr = pc,
+        .ctx = _get_asid(static_cast<uint64_t>((*p->get_state()->satp).read()), p->get_const_xlen()),
         .iretire = 1,
         .ilastsize = insn_length(fetch.insn.bits())/2,
         .i_timestamp = p->total_insn_count,

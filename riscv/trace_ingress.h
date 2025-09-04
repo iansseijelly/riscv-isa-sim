@@ -57,7 +57,8 @@ struct hart_to_encoder_ingress_t {
   priv_enc priv;          // 3 bits
   // retired instruction address
   uint64_t i_addr;        // 64 bits
-  //context, time, ctype, sijump are now unimplemented
+  //ctype, sijump are now unimplemented
+  uint32_t ctx;        // 32 bits
   // number of instructions retired - 0 or 1 for spike harts
   bool iretire;           // 1 bit
   // ilastsize
@@ -97,9 +98,18 @@ static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) 
   else if (_is_mret(insn)) {
     return I_TRAP_RETURN;
   }
-  // TODO: further categorization is not implemented for now
   else {
     return I_NONE;
+  }
+}
+
+static inline uint32_t _get_asid(uint64_t satp, unsigned xlen) {
+  if (xlen == 32) {
+    //30:22 is the asid, 9 bits
+    return (satp >> 22) & 0x1FF;
+  } else {
+    //59:44 is the asid, 16 bits
+    return (satp >> 44) & 0xFFFF;
   }
 }
 
