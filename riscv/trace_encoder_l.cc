@@ -188,17 +188,13 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   this->packet.f_header = F_SYNC;
   this->packet.trap_type = T_NONE;
   this->packet.sync_type = sync_type;
-  this->packet.target_address = (this->ingress_0.i_addr >> 1) ^ (this->ingress_1.i_addr >> 1);
-  this->packet.from_address = this->ingress_1.i_addr >> 1;
-  this->packet.ctx = this->ingress_1.ctx;
+  this->packet.target_address = this->ingress_1.i_addr >> 1;
   this->packet.timestamp = this->ingress_1.i_timestamp;
   this->prev_timestamp = this->ingress_1.i_timestamp;
   // encode the packet
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
-  num_bytes += _encode_varlen(this->packet.ctx, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
-  num_bytes += _encode_varlen(this->packet.from_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
