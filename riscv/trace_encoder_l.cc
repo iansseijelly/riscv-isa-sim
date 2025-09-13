@@ -52,7 +52,7 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   this->ingress_1 = this->ingress_0;
   this->ingress_0 = packet;
   if (this->enabled) {
-    fprintf(this->debug_reference, "%lx, %d\n", packet.i_addr, packet.i_type);
+    fprintf(this->debug_reference, "%lx, priv %d, ctx %d, i_type %d, DASM(%lx)\n", packet.i_addr, packet.priv, packet.ctx, packet.i_type, packet.raw_insn);
     if (this->state == TRACE_ENCODER_L_IDLE) {
       // advance to armed state
       // This is when ingress_0 contains the first valid instruction
