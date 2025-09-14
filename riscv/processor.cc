@@ -424,6 +424,14 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
 {
   unsigned max_xlen = isa.get_max_xlen();
 
+  // By default, trap to M-mode, unless delegated to HS-mode or VS-mode
+  reg_t vsdeleg, hsdeleg;
+  reg_t bit = t.cause();
+  bool curr_virt = state.v;
+  const reg_t interrupt_bit = (reg_t)1 << (max_xlen - 1);
+  bool interrupt = (bit & interrupt_bit) != 0;
+  bool supv_double_trap = false;
+
   if (debug) {
     std::stringstream s; // first put everything in a string, later send it to output
     s << "core " << std::dec << std::setfill(' ') << std::setw(3) << id
@@ -444,7 +452,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
     }
     return;
   }
-
+  
   if (unlikely(trace_enabled)) {
     hart_to_encoder_ingress_t packet {
       .i_type = interrupt ? I_INTERRUPT : I_EXCEPTION,
@@ -453,20 +461,13 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
       .priv = static_cast<priv_enc>(state.prv),
       .i_addr = epc,
       .iretire = 1,
-      .ilastsize = insn_length(t.get_tinst())/2,
+      .ilastsize = insn_length(t.get_tinst())/2, // this is also fake
       .i_timestamp = state.mcycle->read(),
-      .raw_insn = t.get_tinst(),
+      .raw_insn = t.get_tinst(), // this returns 0, so beware in the debug
     };
     trace_encoder->push_ingress(packet);
   }
 
-  // By default, trap to M-mode, unless delegated to HS-mode or VS-mode
-  reg_t vsdeleg, hsdeleg;
-  reg_t bit = t.cause();
-  bool curr_virt = state.v;
-  const reg_t interrupt_bit = (reg_t)1 << (max_xlen - 1);
-  bool interrupt = (bit & interrupt_bit) != 0;
-  bool supv_double_trap = false;
   if (interrupt) {
     vsdeleg = (curr_virt && state.prv <= PRV_S) ? state.hideleg->read() : 0;
     hsdeleg = (state.prv <= PRV_S) ? (state.mideleg->read() | state.nonvirtual_sip->read()) : 0;

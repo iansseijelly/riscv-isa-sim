@@ -83,8 +83,9 @@ static inline bool _is_jalr(insn_t* insn) {
   return CHECK_INSN(JALR) || CHECK_INSN(C_JALR) || CHECK_INSN(C_JR);
 }
 
-static inline bool _is_mret(insn_t* insn) {
-  return CHECK_INSN(MRET);
+static inline bool _is_trap_return(insn_t* insn) {
+  // DRET is intentionally not included, as debug mode is not supported yet
+  return CHECK_INSN(MRET) || CHECK_INSN(SRET);
 }
 
 static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) {
@@ -97,7 +98,7 @@ static inline insn_type _get_insn_type(insn_t* insn, bool taken, unsigned xlen) 
   else if (_is_jalr(insn)) {
     return I_JUMP_UNINFERABLE;
   }
-  else if (_is_mret(insn)) {
+  else if (_is_trap_return(insn)) {
     return I_TRAP_RETURN;
   }
   else {
