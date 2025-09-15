@@ -25,6 +25,7 @@ public:
     virtual void set_enable(bool enabled) { } ;
     virtual void set_br_mode(br_mode_t br_mode) { };
     virtual void set_ctx_mode(ctx_mode_t ctx_mode) { };
+    virtual void set_ctx_id(uint32_t ctx_id) { };
     virtual void init_trace_file() { };
     virtual void reset() { };
     virtual void push_ingress(hart_to_encoder_ingress_t packet) { };

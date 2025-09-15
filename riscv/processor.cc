@@ -460,6 +460,7 @@ void processor_t::take_trap(trap_t& t, reg_t epc)
       .tval = t.get_tval(),
       .priv = static_cast<priv_enc>(state.prv),
       .i_addr = epc,
+      .ctx = _get_asid(static_cast<uint64_t>((*state.satp).read()), get_const_xlen()),
       .iretire = 1,
       .ilastsize = insn_length(t.get_tinst())/2, // this is also fake
       .i_timestamp = state.mcycle->read(),
