@@ -59,9 +59,11 @@ struct trace_encoder_l_packet_t {
 };
 
 enum trace_encoder_l_state_t {
-  TRACE_ENCODER_L_IDLE,
-  TRACE_ENCODER_L_ARMED,
-  TRACE_ENCODER_L_DATA,
+  TRACE_ENCODER_L_IDLE, // not enabled
+  TRACE_ENCODER_L_ARMED, // armed, 1st cycle after leaving idle
+  TRACE_ENCODER_L_DATA, // data, after armed
+  TRACE_ENCODER_L_OOC, // out of context
+  TRACE_ENCODER_L_OOC_ARMED, // out of context, armed
 };
 
 #define MAX_TRACE_BUFFER_SIZE 32
@@ -97,7 +99,7 @@ public:
   br_mode_t get_br_mode();
   void set_ctx_mode(ctx_mode_t ctx_mode) override;
   ctx_mode_t get_ctx_mode();
-  void set_ctx_id(uint32_t ctx_id);
+  void set_ctx_id(uint32_t ctx_id) override;
   uint32_t get_ctx_id();
   void push_ingress(hart_to_encoder_ingress_t packet) override;
   

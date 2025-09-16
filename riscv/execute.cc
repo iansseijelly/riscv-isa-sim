@@ -188,7 +188,7 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
         .ctx = _get_asid(static_cast<uint64_t>((*p->get_state()->satp).read()), p->get_const_xlen()),
         .iretire = 1,
         .ilastsize = insn_length(fetch.insn.bits())/2,
-        .i_timestamp = p->total_insn_count,
+        .i_timestamp = p->get_state()->minstret->read(),
         .raw_insn = fetch.insn.bits(),
         };
         p->trace_encoder->push_ingress(packet);
@@ -199,7 +199,12 @@ static inline reg_t execute_insn_logged(processor_t* p, reg_t pc, insn_fetch_t f
       if (p->get_log_commits_enabled()) {
         commit_log_print_insn(p, pc, fetch.insn);
       }
-     }
+    }
+
+    // bump minstret in execute
+    if (!(p->get_state()->mcountinhibit->read() & MCOUNTINHIBIT_IR))
+      p->get_state()->minstret->bump(1);
+
   } catch (wait_for_interrupt_t &t) {
       if (p->get_log_commits_enabled()) {
         commit_log_print_insn(p, pc, fetch.insn);
@@ -394,7 +399,9 @@ void processor_t::step(size_t n)
       in_wfi = true;
     }
 
-    state.minstret->bump((state.mcountinhibit->read() & MCOUNTINHIBIT_IR) ? 0 : instret);
+    if (likely(!slow_path())) {
+      state.minstret->bump((state.mcountinhibit->read() & MCOUNTINHIBIT_IR) ? 0 : instret);
+    }
 
     // Model a hart whose CPI is 1.
     state.mcycle->bump((state.mcountinhibit->read() & MCOUNTINHIBIT_CY) ? 0 : instret);
