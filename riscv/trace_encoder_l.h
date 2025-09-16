@@ -40,11 +40,18 @@ enum trap_type_t {
 };
 
 enum sync_type_t {
-	S_START     = 0b000,
-	S_PERIODIC  = 0b001,
-	S_ENTER_CTX = 0b010,
-	S_EXIT_CTX  = 0b011,
-	S_END       = 0b111,
+  S_NONE      = 0b000,
+	S_START     = 0b001,
+	S_PERIODIC  = 0b010,
+	S_END       = 0b011,
+	S_ENTER_CTX = 0b100,
+	S_EXIT_CTX  = 0b101,
+};
+
+struct trace_encoder_runtime_cfg_t {
+  br_mode_t br_mode;
+  ctx_mode_t ctx_mode;
+  uint32_t ctx_id;
 };
 
 struct trace_encoder_l_packet_t {
@@ -126,9 +133,7 @@ private:
   // encoder states
   bool active;
   bool enabled;
-  br_mode_t br_mode;
-  ctx_mode_t ctx_mode;
-  uint32_t ctx_id;
+  trace_encoder_runtime_cfg_t runtime_cfg;
   trace_encoder_l_state_t state;
   // previous values
   uint64_t prev_timestamp;

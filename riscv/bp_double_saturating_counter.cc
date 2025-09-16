@@ -33,6 +33,10 @@ branch_prediction_t bp_double_saturating_counter_t::peek(reg_t pc) {
   return counters[index];
 }
 
+int bp_double_saturating_counter_t::get_size() {
+  return num_entries;
+}
+
 const branch_prediction_t bp_double_saturating_counter_t::increment_table[] = {
   WEAK_NOT_TAKEN,  // From STRONG_NOT_TAKEN
   WEAK_TAKEN,      // From WEAK_NOT_TAKEN

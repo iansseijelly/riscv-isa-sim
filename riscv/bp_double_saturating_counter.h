@@ -17,6 +17,7 @@ public:
   void reset();
   bool predict(reg_t pc, bool taken);
   branch_prediction_t peek(reg_t pc);
+  int get_size();
 private:
   int num_entries;
   std::vector<branch_prediction_t> counters;

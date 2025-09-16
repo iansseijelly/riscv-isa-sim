@@ -18,27 +18,27 @@ bool trace_encoder_l::get_enable() {
 }
 
 void trace_encoder_l::set_br_mode(br_mode_t br_mode) {
-  this->br_mode = br_mode;
+  this->runtime_cfg.br_mode = br_mode;
 }
 
 br_mode_t trace_encoder_l::get_br_mode() {
-  return this->br_mode;
+  return this->runtime_cfg.br_mode;
 }
 
 void trace_encoder_l::set_ctx_mode(ctx_mode_t ctx_mode) {
-  this->ctx_mode = ctx_mode;
+  this->runtime_cfg.ctx_mode = ctx_mode;
 }
 
 void trace_encoder_l::set_ctx_id(uint32_t ctx_id) {
-  this->ctx_id = ctx_id;
+  this->runtime_cfg.ctx_id = ctx_id;
 }
 
 ctx_mode_t trace_encoder_l::get_ctx_mode() {
-  return this->ctx_mode;
+  return this->runtime_cfg.ctx_mode;
 }
 
 uint32_t trace_encoder_l::get_ctx_id() {
-  return this->ctx_id;
+  return this->runtime_cfg.ctx_id;
 }
 
 void trace_encoder_l::init_trace_file()
@@ -54,7 +54,7 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   if (this->enabled) {
     fprintf(this->debug_reference, "%lx, timestamp %lx, ctx %d, priv %d, i_type %d, DASM(%lx)\n", \
       packet.i_addr, packet.i_timestamp, packet.ctx, packet.priv, packet.i_type, packet.raw_insn);
-    bool context_match = (this->ctx_mode == CTX_WATCH && this->ctx_id == packet.ctx) || this->ctx_mode == CTX_NONE;
+    bool context_match = (this->runtime_cfg.ctx_mode == CTX_WATCH && this->runtime_cfg.ctx_id == packet.ctx) || this->runtime_cfg.ctx_mode == CTX_NONE;
 
     if (this->state == TRACE_ENCODER_L_IDLE) {
      if (!context_match) {
@@ -71,9 +71,9 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
       this->state = TRACE_ENCODER_L_DATA;
 
     } else if (this->state == TRACE_ENCODER_L_DATA) {
-      if (this->br_mode == BR_TARG) {
+      if (this->runtime_cfg.br_mode == BR_TARG) {
         _bt_mode_data_step();
-      } else if (this->br_mode == BR_PRED) {
+      } else if (this->runtime_cfg.br_mode == BR_PRED) {
         _bp_mode_data_step();
       }
       if (!context_match) {
@@ -218,6 +218,13 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
+  // serialize necessary configuration to the packet if this is a start packet
+  if (sync_type == S_START) {
+    num_bytes += _encode_varlen(this->runtime_cfg.br_mode, this->buffer + num_bytes);
+    num_bytes += _encode_varlen(this->bp->get_size(), this->buffer + num_bytes);
+    num_bytes += _encode_varlen(this->runtime_cfg.ctx_mode, this->buffer + num_bytes);
+    num_bytes += _encode_varlen(this->runtime_cfg.ctx_id, this->buffer + num_bytes);
+  }
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
   _log_packet(&this->packet);
@@ -305,6 +312,7 @@ int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buf
   buffer[0] = packet->c_header | packet->f_header << 2 | func << 5;
   return 1;
 }
+
 int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer) {
   return _encode_non_compressed_header(packet, buffer, 0);
   // buffer[0] = packet->c_header | packet->f_header << 2;
