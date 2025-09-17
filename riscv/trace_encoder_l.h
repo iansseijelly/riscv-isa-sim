@@ -83,6 +83,7 @@ int ceil_div(int a, int b);
 int encode_varlen(uint64_t value, uint8_t* buffer);
 c_header_t get_c_header(f_header_t f_header);
 int _encode_varlen(uint64_t value, uint8_t* buffer);
+int _encode_prv(priv_enc from_priv, priv_enc to_priv, uint8_t* buffer);
 int _encode_compressed_packet(trace_encoder_l_packet_t* packet, uint8_t* buffer);
 int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer, int func);
 int _encode_non_compressed_header(trace_encoder_l_packet_t* packet, uint8_t* buffer);

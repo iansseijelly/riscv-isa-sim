@@ -277,6 +277,7 @@ void trace_encoder_l::_generate_trap_packet(trap_type_t trap_type) {
   // encode the packet
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, trap_type);
+  num_bytes += _encode_prv(this->ingress_1.priv, this->ingress_0.priv, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.from_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
@@ -329,6 +330,11 @@ int _encode_varlen(uint64_t value, uint8_t* buffer) {
     value >>= 7;
   }
   return num_bytes;
+}
+
+int _encode_prv(priv_enc from_priv, priv_enc to_priv, uint8_t* buffer) {
+  buffer[0] = from_priv | to_priv << 3 | 0b10 << 6;
+  return 1;
 }
 
 // returns the 0-index of the most significant bit
