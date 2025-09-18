@@ -216,6 +216,7 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   // encode the packet
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
+  num_bytes += _encode_prv(P_U, this->ingress_1.priv, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   // serialize necessary configuration to the packet if this is a start packet
