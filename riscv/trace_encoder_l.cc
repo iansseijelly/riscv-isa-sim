@@ -25,22 +25,6 @@ br_mode_t trace_encoder_l::get_br_mode() {
   return this->runtime_cfg.br_mode;
 }
 
-void trace_encoder_l::set_ctx_mode(ctx_mode_t ctx_mode) {
-  this->runtime_cfg.ctx_mode = ctx_mode;
-}
-
-void trace_encoder_l::set_ctx_id(uint32_t ctx_id) {
-  this->runtime_cfg.ctx_id = ctx_id;
-}
-
-ctx_mode_t trace_encoder_l::get_ctx_mode() {
-  return this->runtime_cfg.ctx_mode;
-}
-
-uint32_t trace_encoder_l::get_ctx_id() {
-  return this->runtime_cfg.ctx_id;
-}
-
 void trace_encoder_l::init_trace_file()
 {
   this->trace_sink = fopen("tacit.out", "wb");
@@ -54,42 +38,26 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
   if (this->enabled) {
     fprintf(this->debug_reference, "%lx, timestamp %lx, ctx %d, priv %d, i_type %d, DASM(%lx)\n", \
       packet.i_addr, packet.i_timestamp, packet.ctx, packet.priv, packet.i_type, packet.raw_insn);
-    bool context_match = (this->runtime_cfg.ctx_mode == CTX_WATCH && this->runtime_cfg.ctx_id == packet.ctx) || this->runtime_cfg.ctx_mode == CTX_NONE;
-
     if (this->state == TRACE_ENCODER_L_IDLE) {
-     if (!context_match) {
-        this->state = TRACE_ENCODER_L_OOC;
-      } else {
         // advance to armed state
         // This is when ingress_0 contains the first valid instruction
         // But ingress_1 is still empty
         this->state = TRACE_ENCODER_L_ARMED;
       }
-
-    } else if (this->state == TRACE_ENCODER_L_ARMED) {
+    else if (this->state == TRACE_ENCODER_L_ARMED) {
       _generate_sync_packet(S_START);
       this->state = TRACE_ENCODER_L_DATA;
-
     } else if (this->state == TRACE_ENCODER_L_DATA) {
+      // if context has changed from previous cycle, generate a sync packet
+      if (this->ingress_0.ctx != this->ingress_1.ctx) {
+        _generate_context_packet();
+      }
       if (this->runtime_cfg.br_mode == BR_TARG) {
         _bt_mode_data_step();
       } else if (this->runtime_cfg.br_mode == BR_PRED) {
         _bp_mode_data_step();
       }
-      if (!context_match) {
-        this->state = TRACE_ENCODER_L_OOC;
-      } // else stay in data state
-
-    } else if (this->state == TRACE_ENCODER_L_OOC) {
-      if (context_match) {
-        this->state = TRACE_ENCODER_L_OOC_ARMED;
-      }
-
-    } else if (this->state == TRACE_ENCODER_L_OOC_ARMED) {
-      _generate_sync_packet(S_ENTER_CTX);
-      this->state = TRACE_ENCODER_L_DATA;
-    }
-
+    } 
   } else if (!this->enabled) {
     if (this->state == TRACE_ENCODER_L_DATA) {
       _generate_sync_packet(S_END);
@@ -217,14 +185,13 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
   num_bytes += _encode_prv(P_U, this->ingress_1.priv, this->buffer + num_bytes);
+  num_bytes += _encode_varlen(this->ingress_1.ctx, this->buffer + num_bytes); // report the current context
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
-  // serialize necessary configuration to the packet if this is a start packet
   if (sync_type == S_START) {
+    // serialize runtime configuration
     num_bytes += _encode_varlen(this->runtime_cfg.br_mode, this->buffer + num_bytes);
     num_bytes += _encode_varlen(this->bp->get_size(), this->buffer + num_bytes);
-    num_bytes += _encode_varlen(this->runtime_cfg.ctx_mode, this->buffer + num_bytes);
-    num_bytes += _encode_varlen(this->runtime_cfg.ctx_id, this->buffer + num_bytes);
   }
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
@@ -284,6 +251,22 @@ void trace_encoder_l::_generate_trap_packet(trap_type_t trap_type) {
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   _log_packet(&this->packet);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
+}
+
+void trace_encoder_l::_generate_context_packet() {
+  int num_bytes = 0;
+  this->packet.c_header = C_NA;
+  this->packet.f_header = F_CTX;
+  this->packet.trap_type = T_NONE;
+  this->packet.target_address = 0;
+  this->packet.timestamp = this->ingress_1.i_timestamp - this->prev_timestamp;
+  this->prev_timestamp = this->ingress_1.i_timestamp;
+  num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, 0);
+  num_bytes += _encode_varlen(this->ingress_1.ctx, this->buffer + num_bytes); // report the previous context for debugging
+  num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes); // report the new context
+  num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
+  fwrite(this->buffer, 1, num_bytes, this->trace_sink);
+  _log_packet(&this->packet);
 }
 
 void trace_encoder_l::_generate_hit_packet() {

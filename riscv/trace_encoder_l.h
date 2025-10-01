@@ -28,7 +28,7 @@ enum f_header_t {
 	F_IJ   = 0b011, // inferable jump
 	F_TRAP = 0b100, // trapping happened - could be interrupt or exception
 	F_SYNC = 0b101, // a synchronization packet
-	F_VAL  = 0b110, // this packets report a certain value upon request
+	F_CTX  = 0b110, // a change in context
 	F_RES  = 0b111, // reserved for now
 };
 
@@ -44,14 +44,10 @@ enum sync_type_t {
 	S_START     = 0b001,
 	S_PERIODIC  = 0b010,
 	S_END       = 0b011,
-	S_ENTER_CTX = 0b100,
-	S_EXIT_CTX  = 0b101,
 };
 
 struct trace_encoder_runtime_cfg_t {
   br_mode_t br_mode;
-  ctx_mode_t ctx_mode;
-  uint32_t ctx_id;
 };
 
 struct trace_encoder_l_packet_t {
@@ -69,8 +65,6 @@ enum trace_encoder_l_state_t {
   TRACE_ENCODER_L_IDLE, // not enabled
   TRACE_ENCODER_L_ARMED, // armed, 1st cycle after leaving idle
   TRACE_ENCODER_L_DATA, // data, after armed
-  TRACE_ENCODER_L_OOC, // out of context
-  TRACE_ENCODER_L_OOC_ARMED, // out of context, armed
 };
 
 #define MAX_TRACE_BUFFER_SIZE 32
@@ -105,10 +99,6 @@ public:
   bool get_enable() override;
   void set_br_mode(br_mode_t br_mode) override;
   br_mode_t get_br_mode();
-  void set_ctx_mode(ctx_mode_t ctx_mode) override;
-  ctx_mode_t get_ctx_mode();
-  void set_ctx_id(uint32_t ctx_id) override;
-  uint32_t get_ctx_id();
   void push_ingress(hart_to_encoder_ingress_t packet) override;
   
 private:
@@ -116,6 +106,7 @@ private:
   void _generate_direct_packet(f_header_t f_header);
   void _generate_jump_uninferable_packet();
   void _generate_trap_packet(trap_type_t trap_type);
+  void _generate_context_packet();
   void _generate_hit_packet();
 
   void _log_packet(trace_encoder_l_packet_t* packet);
@@ -138,6 +129,7 @@ private:
   trace_encoder_l_state_t state;
   // previous values
   uint64_t prev_timestamp;
+  uint32_t prev_ctx;
   // branch predictor
   bp_double_saturating_counter_t* bp;
   size_t hit_count;
