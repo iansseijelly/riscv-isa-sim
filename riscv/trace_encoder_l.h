@@ -63,7 +63,6 @@ struct trace_encoder_l_packet_t {
 
 enum trace_encoder_l_state_t {
   TRACE_ENCODER_L_IDLE, // not enabled
-  TRACE_ENCODER_L_ARMED, // armed, 1st cycle after leaving idle
   TRACE_ENCODER_L_DATA, // data, after armed
 };
 

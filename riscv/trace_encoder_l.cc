@@ -42,12 +42,10 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
         // advance to armed state
         // This is when ingress_0 contains the first valid instruction
         // But ingress_1 is still empty
-        this->state = TRACE_ENCODER_L_ARMED;
+        _generate_sync_packet(S_START);
+        this->state = TRACE_ENCODER_L_DATA;
       }
-    else if (this->state == TRACE_ENCODER_L_ARMED) {
-      _generate_sync_packet(S_START);
-      this->state = TRACE_ENCODER_L_DATA;
-    } else if (this->state == TRACE_ENCODER_L_DATA) {
+    else if (this->state == TRACE_ENCODER_L_DATA) {
       // if context has changed from previous cycle, generate a sync packet
       if (this->ingress_0.ctx != this->ingress_1.ctx) {
         _generate_context_packet();
@@ -178,14 +176,14 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   this->packet.f_header = F_SYNC;
   this->packet.trap_type = T_NONE;
   this->packet.sync_type = sync_type;
-  this->packet.target_address = this->ingress_1.i_addr >> 1;
-  this->packet.timestamp = this->ingress_1.i_timestamp;
-  this->prev_timestamp = this->ingress_1.i_timestamp;
+  this->packet.target_address = this->ingress_0.i_addr >> 1;
+  this->packet.timestamp = this->ingress_0.i_timestamp;
+  this->prev_timestamp = this->ingress_0.i_timestamp;
   // encode the packet
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
-  num_bytes += _encode_prv(P_U, this->ingress_1.priv, this->buffer + num_bytes);
-  num_bytes += _encode_varlen(this->ingress_1.ctx, this->buffer + num_bytes); // report the current context
+  num_bytes += _encode_prv(P_U, this->ingress_0.priv, this->buffer + num_bytes);
+  num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes); // report the current context
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   if (sync_type == S_START) {
