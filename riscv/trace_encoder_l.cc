@@ -46,10 +46,6 @@ void trace_encoder_l::push_ingress(hart_to_encoder_ingress_t packet) {
         this->state = TRACE_ENCODER_L_DATA;
       }
     else if (this->state == TRACE_ENCODER_L_DATA) {
-      // if context has changed from previous cycle, generate a sync packet
-      if (this->ingress_0.ctx != this->ingress_1.ctx) {
-        _generate_context_packet();
-      }
       if (this->runtime_cfg.br_mode == BR_TARG) {
         _bt_mode_data_step();
       } else if (this->runtime_cfg.br_mode == BR_PRED) {
@@ -184,13 +180,12 @@ void trace_encoder_l::_generate_sync_packet(sync_type_t sync_type) {
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, sync_type);
   num_bytes += _encode_prv(P_U, this->ingress_0.priv, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes); // report the current context
-  num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
-  num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   if (sync_type == S_START) {
     // serialize runtime configuration
-    num_bytes += _encode_varlen(this->runtime_cfg.br_mode, this->buffer + num_bytes);
-    num_bytes += _encode_varlen(this->bp->get_size(), this->buffer + num_bytes);
+    num_bytes += _encode_runtime_cfg(this->runtime_cfg.br_mode, this->bp->get_size(), this->buffer + num_bytes);
   }
+  num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
+  num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   // write the packet to the trace sink
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
   _log_packet(&this->packet);
@@ -244,27 +239,15 @@ void trace_encoder_l::_generate_trap_packet(trap_type_t trap_type) {
   int num_bytes = 0;
   num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, trap_type);
   num_bytes += _encode_prv(this->ingress_1.priv, this->ingress_0.priv, this->buffer + num_bytes);
+  // if we're returning into user mode, report ctx as well
+  if (this->ingress_0.priv == P_U && trap_type == T_TRAP_RETURN) {
+    num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes);
+  }
   num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.from_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   _log_packet(&this->packet);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
-}
-
-void trace_encoder_l::_generate_context_packet() {
-  int num_bytes = 0;
-  this->packet.c_header = C_NA;
-  this->packet.f_header = F_CTX;
-  this->packet.trap_type = T_NONE;
-  this->packet.target_address = 0;
-  this->packet.timestamp = this->ingress_1.i_timestamp - this->prev_timestamp;
-  this->prev_timestamp = this->ingress_1.i_timestamp;
-  num_bytes += _encode_non_compressed_header(&this->packet, this->buffer, 0);
-  num_bytes += _encode_varlen(this->ingress_1.ctx, this->buffer + num_bytes); // report the previous context for debugging
-  num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes); // report the new context
-  num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
-  fwrite(this->buffer, 1, num_bytes, this->trace_sink);
-  _log_packet(&this->packet);
 }
 
 void trace_encoder_l::_generate_hit_packet() {
@@ -316,6 +299,11 @@ int _encode_varlen(uint64_t value, uint8_t* buffer) {
 
 int _encode_prv(priv_enc from_priv, priv_enc to_priv, uint8_t* buffer) {
   buffer[0] = from_priv | to_priv << 3 | 0b10 << 6;
+  return 1;
+}
+
+int _encode_runtime_cfg(br_mode_t br_mode, int bp_size, uint8_t* buffer) {
+  buffer[0] = br_mode | (bp_size / 64) << 2;
   return 1;
 }
 
