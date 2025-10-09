@@ -343,6 +343,11 @@ void sim_t::configure_log(bool enable_log, bool enable_commitlog, bool trace)
   }
 }
 
+void sim_t::configure_log(bool enable_log, bool enable_commitlog)
+{
+  configure_log(enable_log, enable_commitlog, false);
+}
+
 void sim_t::set_procs_debug(bool value)
 {
   for (size_t i=0; i< procs.size(); i++)
