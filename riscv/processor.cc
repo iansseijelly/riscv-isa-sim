@@ -119,7 +119,7 @@ void processor_t::create_trace_encoder() {
         fprintf(stderr, "Unknown trace encoder type: %s\\n", trace_encoder_type.c_str());
         abort();
     }
-    fprintf(stderr, "Created trace_encoder of type: %s at %p\\n", trace_encoder_type.c_str(), (void*)trace_encoder);
+    // fprintf(stderr, "Created trace_encoder of type: %s at %p\\n", trace_encoder_type.c_str(), (void*)trace_encoder);
     assert(trace_encoder != nullptr);
 }
 

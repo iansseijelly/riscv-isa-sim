@@ -243,8 +243,8 @@ void trace_encoder_l::_generate_trap_packet(trap_type_t trap_type) {
   if (this->ingress_0.priv == P_U && trap_type == T_TRAP_RETURN) {
     num_bytes += _encode_varlen(this->ingress_0.ctx, this->buffer + num_bytes);
   }
-  num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.from_address, this->buffer + num_bytes);
+  num_bytes += _encode_varlen(this->packet.target_address, this->buffer + num_bytes);
   num_bytes += _encode_varlen(this->packet.timestamp, this->buffer + num_bytes);
   _log_packet(&this->packet);
   fwrite(this->buffer, 1, num_bytes, this->trace_sink);
